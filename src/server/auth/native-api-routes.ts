@@ -3,6 +3,7 @@ const fileId = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const facilityEvidence = new RegExp(`^/api/facility/evidence/${fileId}$`, 'i');
 const constructionDrawing = new RegExp(`^/api/construction/drawings/${fileId}$`, 'i');
 const constructionHandover = /^\/api\/construction\/handover\/chp-[0-9a-f-]{36}$/i;
+const constructionEvidence = /^\/api\/construction\/evidence\/sync-[0-9a-f]{32}\/(?:[0-9]|1[0-9])$/i;
 
 /** The native-auth proxy permits only company-aware API routes. The routes
  * themselves still perform session, company and record-level authorization. */
@@ -27,5 +28,6 @@ export function nativeApiRouteAllowed(pathname: string): boolean {
     || pathname === '/api/construction/reports/export'
     || pathname === '/api/webhooks/resend'
     || constructionDrawing.test(pathname)
+    || constructionEvidence.test(pathname)
     || constructionHandover.test(pathname);
 }

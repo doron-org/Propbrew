@@ -10,6 +10,10 @@ describe('native API proxy allowlist', () => {
     expect(nativeApiRouteAllowed('/api/construction/transmittals/acknowledge')).toBe(true);
     expect(nativeApiRouteAllowed('/api/construction/transmittals/tr-new-42/retry')).toBe(true);
     expect(nativeApiRouteAllowed('/api/construction/reports/export')).toBe(true);
+    expect(nativeApiRouteAllowed('/api/mobile/v1/construction/bootstrap')).toBe(true);
+    expect(nativeApiRouteAllowed('/api/mobile/v1/construction/sync')).toBe(true);
+    expect(nativeApiRouteAllowed('/api/mobile/v1/construction/upload')).toBe(true);
+    expect(nativeApiRouteAllowed('/api/construction/evidence/sync-0123456789abcdef0123456789abcdef/0')).toBe(true);
   });
 
   it('keeps unrelated or malformed API paths closed', () => {
@@ -17,6 +21,8 @@ describe('native API proxy allowlist', () => {
     expect(nativeApiRouteAllowed('/api/construction/handover/../../admin')).toBe(false);
     expect(nativeApiRouteAllowed('/api/construction/drawings/00000000-0000-4000-8000-000000000000/extra')).toBe(false);
     expect(nativeApiRouteAllowed('/api/construction/transmittals/tr-new-42/../../admin')).toBe(false);
+    expect(nativeApiRouteAllowed('/api/construction/evidence/sync-0123456789abcdef0123456789abcdef/../../admin')).toBe(false);
+    expect(nativeApiRouteAllowed('/api/construction/evidence/sync-0123456789abcdef0123456789abcdef/20')).toBe(false);
     expect(nativeApiRouteAllowed('/api/finance/settlements')).toBe(false);
     expect(nativeApiRouteAllowed('/api/facility/evidence')).toBe(true);
   });
