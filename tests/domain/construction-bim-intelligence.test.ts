@@ -104,6 +104,19 @@ describe('native construction BIM exchange and forecast evidence', () => {
     expect(second.pendingPages).toEqual([]); expect(second.pages.map((row) => row.page)).toEqual([1, 2, 3]);
   });
 
+  it('does not treat a selectable title block as a fully searchable scanned plan', async () => {
+    const pdf = await PDFDocument.create(); const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const page = pdf.addPage(); page.drawText('SITE PLAN A', { x: 30, y: 700, font, size: 12 });
+    const bytes = await pdf.save();
+    const first = await extractConstructionPdfForIndex(bytes);
+    expect(first.pages).toEqual([{ page: 1, text: 'SITE PLAN A', method: 'text' }]);
+    expect(first.pendingPages).toEqual([1]);
+    const second = await extractConstructionPdfForIndex(bytes, { existing: { tenantId: 't', projectId: 'p', docId: 'd', fileId: 'f', sha256: 's', pages: first.pages, pendingPages: first.pendingPages, extractedAtISO: '' },
+      maxOcrPages: 1, ocrPage: async () => 'SITE PLAN A drainage riser at grid B7' });
+    expect(second.pendingPages).toEqual([]);
+    expect(second.pages[0]).toMatchObject({ page: 1, method: 'ocr', text: 'SITE PLAN A drainage riser at grid B7' });
+  });
+
   it('retrieves PDF pages only when tenant, project, document and file hash match an authorised revision', () => {
     const company = '46a4660b-90d2-478b-89b3-d516779bded2';
     const actor = actorForCompanyMember({ membershipId: 'm1', userId: 'u1', companyId: company, companyRole: 'member', status: 'active', companyStatus: 'active',

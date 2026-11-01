@@ -37,18 +37,25 @@ export async function extractConstructionPdfForIndex(bytes: Uint8Array, options:
     let ocrCount = 0, ocrErrors = 0;
     const pageCount = Math.min(pdf.numPages, MAX_PAGES);
     for (let page = 1; page <= pageCount; page++) {
-      if (pages.some((row) => row.page === page)) continue;
+      const previous = pages.find((row) => row.page === page);
+      if (previous && !options.existing?.pendingPages?.includes(page)) continue;
       const pdfPage = await pdf.getPage(page);
       const content = await pdfPage.getTextContent();
       const text = content.items.map((item) => 'str' in item ? item.str : '').join(' ').replace(/\s+/g, ' ').trim().slice(0, MAX_PAGE_TEXT);
-      // A few selectable labels on a scanned plan are not the document text.
-      if (text.length >= 24) { if (total + text.length <= MAX_INDEX_TEXT) { pages.push({ page, text, method: 'text' }); total += text.length; } continue; }
+      // A selectable title block does not mean the raster plan is searchable.
+      if (text.length >= 120) { if (!previous && total + text.length <= MAX_INDEX_TEXT) { pages.push({ page, text, method: 'text' }); total += text.length; } continue; }
+      if (text && !previous && total + text.length <= MAX_INDEX_TEXT) { pages.push({ page, text, method: 'text' }); total += text.length; }
       if (!options.ocrPage || ocrCount >= Math.min(options.maxOcrPages ?? 0, 5) || total >= MAX_INDEX_TEXT) { pendingPages.push(page); continue; }
       ocrCount++;
       try {
         const png = await renderPdfPageForOcr(pdfPage);
         const recognized = (await options.ocrPage(png, page)).replace(/\s+/g, ' ').trim().slice(0, Math.min(MAX_PAGE_TEXT, MAX_INDEX_TEXT - total));
-        if (recognized.length >= 12) { pages.push({ page, text: recognized, method: 'ocr' }); total += recognized.length; }
+        if (recognized.length >= 12) {
+          const combined = text && !recognized.toLowerCase().includes(text.toLowerCase()) ? `${text} ${recognized}`.slice(0, MAX_PAGE_TEXT) : recognized;
+          const at = pages.findIndex((row) => row.page === page);
+          if (at >= 0) pages[at] = { page, text: combined, method: 'ocr' }; else pages.push({ page, text: combined, method: 'ocr' });
+          total += combined.length - (previous?.text.length ?? text.length);
+        }
         else pendingPages.push(page);
       } catch { ocrErrors++; pendingPages.push(page); }
     }
