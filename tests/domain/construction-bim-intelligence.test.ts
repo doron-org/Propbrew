@@ -5,7 +5,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { createBcfZip, parseBcfZip } from '@/domain/construction/bcf';
 import { detectModelFormat, compareModels } from '@/domain/construction/model-clashes';
 import { evaluateConstructionForecasts, type ForecastSnapshot } from '@/domain/construction/forecast-evaluation';
-import { parseIfcModel } from '@/server/construction/ifc-model';
+import { parseIfcMesh, parseIfcModel } from '@/server/construction/ifc-model';
 import { extractConstructionPdfText } from '@/server/construction/document-text';
 import { retrieveConstructionDocumentText } from '@/server/construction/document-text';
 import { runWithRecordContext } from '@/server/data/record-context';
@@ -24,6 +24,10 @@ describe('native construction BIM exchange and forecast evidence', () => {
     expect(elements.some((row) => /^[0-9A-Za-z_$]{22}$/.test(row.id))).toBe(true);
     expect(elements.every((row) => row.min.every(Number.isFinite) && row.max.every(Number.isFinite))).toBe(true);
     expect(compareModels(elements.slice(0, 1), elements.slice(1, 2))).toBeDefined();
+    const meshes = await parseIfcMesh(file);
+    expect(meshes.length).toBeGreaterThan(50);
+    expect(meshes.some((row) => /^[0-9A-Za-z_$]{22}$/.test(row.id) && row.positions.length >= 9)).toBe(true);
+    expect(meshes.every((row) => row.positions.length === row.triangleCount * 9)).toBe(true);
   });
 
   it('round trips BCF 3.0 topics with IFC component references', () => {

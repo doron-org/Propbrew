@@ -15,6 +15,8 @@ describe('native API proxy allowlist', () => {
     expect(nativeApiRouteAllowed('/api/mobile/v1/construction/upload')).toBe(true);
     expect(nativeApiRouteAllowed('/api/construction/evidence/sync-0123456789abcdef0123456789abcdef/0')).toBe(true);
     expect(nativeApiRouteAllowed('/api/construction/field-photos/00000000-0000-4000-8000-000000000000')).toBe(true);
+    expect(nativeApiRouteAllowed('/api/construction/models/00000000-0000-4000-8000-000000000000/mesh')).toBe(true);
+    expect(nativeApiRouteAllowed('/api/construction/models/revisions')).toBe(true);
   });
 
   it('keeps unrelated or malformed API paths closed', () => {
@@ -25,6 +27,7 @@ describe('native API proxy allowlist', () => {
     expect(nativeApiRouteAllowed('/api/construction/evidence/sync-0123456789abcdef0123456789abcdef/../../admin')).toBe(false);
     expect(nativeApiRouteAllowed('/api/construction/evidence/sync-0123456789abcdef0123456789abcdef/20')).toBe(false);
     expect(nativeApiRouteAllowed('/api/construction/field-photos/../../admin')).toBe(false);
+    expect(nativeApiRouteAllowed('/api/construction/models/../../admin/mesh')).toBe(false);
     expect(nativeApiRouteAllowed('/api/finance/settlements')).toBe(false);
     expect(nativeApiRouteAllowed('/api/facility/evidence')).toBe(true);
   });

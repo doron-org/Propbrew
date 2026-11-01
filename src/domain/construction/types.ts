@@ -132,7 +132,8 @@ export type Issue = TenantScoped & {
   remediation?: { description: string; photoIds: string[]; submittedBy: string; submittedAtISO: string };
   inspection?: QualityInspection;
   clashDetection?: { runId: string; modelAId: string; modelBId: string; componentAId: string; componentBId: string;
-    point: [number, number, number]; overlapMm: number; method: 'component_envelope_v1' };
+    point: [number, number, number]; overlapMm: number; clearanceMm?: number; intersects?: boolean;
+    method: 'component_envelope_v1' | 'triangle_surface_v1' };
   bcf?: { guid: string; importedAtISO?: string; source?: string; description?: string; externalStatus?: string; componentIds?: string[] };
   clashReview?: { disposition: 'confirmed' | 'false_positive' | 'accepted_tolerance' | 'needs_redesign';
     rationale: string; evidenceReference: string; reviewerId: string; reviewerName: string; reviewedAtISO: string };

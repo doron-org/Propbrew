@@ -12,20 +12,22 @@ import { db, validateWorkspaceRecordState } from '@/server/data/store';
 import { withWorkspaceState } from '@/server/data/workspace-postgres';
 import { operatingDateISO, operatingNowISO } from '@/server/operating-clock';
 import { rfiPackageAllowed } from './rfi-access';
-import { compareModels, detectModelFormat, parseModelComponents, type ModelFormat, type Point3 } from '@/domain/construction/model-clashes';
-import { parseIfcModel } from './ifc-model';
+import { detectModelFormat, type ModelFormat, type Point3 } from '@/domain/construction/model-clashes';
+import { compareMeshSurfaces, compareModelRevisions, parseModelMesh, type MeshElement } from '@/domain/construction/model-mesh';
+import { parseIfcMesh } from './ifc-model';
 import { createBcfZip, parseBcfZip, type BcfTopic } from '@/domain/construction/bcf';
 import type { Issue, Project } from '@/domain/construction/types';
 
 export type StoredModel = { id: string; tenantId: string; projectId: string; workPackageId?: string; discipline: string;
-  name: string; format: ModelFormat; size: number; sha256: string; componentCount: number; uploadedBy: string; uploadedAtISO: string };
+  name: string; format: ModelFormat; size: number; sha256: string; componentCount: number; uploadedBy: string; uploadedAtISO: string;
+  modelCode?: string; revision?: string };
 export type ClashRun = { id: string; projectId: string; modelAId: string; modelBId: string; toleranceMm: number;
-  compared: number; candidates: number; created: number; runBy: string; runAtISO: string; method: 'component_envelope_v1' };
+  compared: number; candidates: number; created: number; runBy: string; runAtISO: string; method: 'component_envelope_v1' | 'triangle_surface_v1' };
 type Registry = { models: StoredModel[]; runs: ClashRun[]; receipts: { actorId: string; key: string; hash: string; modelId: string }[] };
 export class ConstructionModelError extends Error { constructor(message: string, readonly status = 400) { super(message); } }
 const uuid = (value: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const packageScopeIds = (project: Project, id?: string): string[] => { const pack = project.mobilisation?.workPackages.find((row) => row.id === id); return id ? pack?.costCode ? [id, `${project.id}:${pack.costCode}`] : [id] : []; };
-const componentsFor = (bytes: Uint8Array, name: string) => detectModelFormat(bytes, name) === 'ifc' ? parseIfcModel(bytes) : Promise.resolve(parseModelComponents(bytes, name));
+const meshFor = (bytes: Uint8Array, name: string): Promise<MeshElement[]> => detectModelFormat(bytes, name) === 'ifc' ? parseIfcMesh(bytes) : Promise.resolve(parseModelMesh(bytes, name));
 
 function registry(write = false): Registry {
   const context = currentRecordContext(); if (!context) return { models: [], runs: [], receipts: [] };
@@ -74,17 +76,18 @@ function modelName(value: string, format: ModelFormat): string {
   return base.toLowerCase().endsWith(`.${format}`) ? base : `${base}.${format}`;
 }
 export async function storeConstructionModel(input: { expectedCompanyId: string; projectId: string; workPackageId?: string; discipline: string;
-  key: string; name: string; bytes: Uint8Array }): Promise<StoredModel> {
+  modelCode?: string; revision?: string; key: string; name: string; bytes: Uint8Array }): Promise<StoredModel> {
   const identity = await principal(true);
   if (identity.company.id !== input.expectedCompanyId) throw new ConstructionModelError('Your company changed. Reopen the model upload.', 409);
   if (!/^[A-Za-z0-9_-]{16,100}$/.test(input.key)) throw new ConstructionModelError('A valid upload request identifier is required.');
   if (!input.projectId || input.projectId.length > 200 || !input.discipline.trim() || input.discipline.length > 80) throw new ConstructionModelError('Choose a project and discipline.');
+  if (input.modelCode && !/^[A-Za-z0-9._-]{2,60}$/.test(input.modelCode) || input.revision && !/^[A-Za-z0-9._-]{1,30}$/.test(input.revision)) throw new ConstructionModelError('Use a short model code and revision, such as STR-L4 and P02.');
   const format = detectModelFormat(input.bytes, input.name);
   if (!format) throw new ConstructionModelError('Choose a valid IFC, OBJ or embedded GLB model of at most 12 MB.');
-  let components: ReturnType<typeof parseModelComponents>;
-  try { components = await componentsFor(input.bytes, input.name); } catch (error) { throw new ConstructionModelError(error instanceof Error ? error.message : 'Model geometry is invalid.'); }
+  let components: MeshElement[];
+  try { components = await meshFor(input.bytes, input.name); } catch (error) { throw new ConstructionModelError(error instanceof Error ? error.message : 'Model geometry is invalid.'); }
   const sha256 = createHash('sha256').update(input.bytes).digest('hex'), name = modelName(input.name, format);
-  const requestHash = createHash('sha256').update(JSON.stringify([input.projectId, input.workPackageId ?? '', input.discipline.trim(), name, sha256])).digest('hex');
+  const requestHash = createHash('sha256').update(JSON.stringify([input.projectId, input.workPackageId ?? '', input.discipline.trim(), input.modelCode ?? '', input.revision ?? '', name, sha256])).digest('hex');
   const saved = await inWorkspace(identity, async (client) => {
     const project = scopedConstructionProjectGet(identity.actor, input.projectId, 'create');
     if (!project || !rfiPackageAllowed(identity.actor, project, input.workPackageId)) throw new ConstructionModelError('Project or work package unavailable.', 404);
@@ -95,13 +98,17 @@ export async function storeConstructionModel(input: { expectedCompanyId: string;
       if (!found || replay.hash !== requestHash || !visible(identity.actor, found)) throw new ConstructionModelError('This upload request changed. Reopen the form.', 409);
       return { value: structuredClone(found), commit: false };
     }
+    if (input.modelCode && input.revision && ledger.models.some((row) => row.projectId === project.id &&
+      row.workPackageId === input.workPackageId && row.modelCode === input.modelCode!.trim().toUpperCase() && row.revision === input.revision!.trim().toUpperCase()))
+      throw new ConstructionModelError('That model code and revision already exist in this project and package. Choose the next revision.', 409);
     const model: StoredModel = { id: randomUUID(), tenantId: identity.company.id, projectId: project.id,
       workPackageId: input.workPackageId, discipline: input.discipline.trim(), name, format, size: input.bytes.length,
-      sha256, componentCount: components.length, uploadedBy: identity.user.id, uploadedAtISO: operatingNowISO() };
+      sha256, componentCount: components.length, uploadedBy: identity.user.id, uploadedAtISO: operatingNowISO(),
+      modelCode: input.modelCode?.trim().toUpperCase(), revision: input.revision?.trim().toUpperCase() };
     await client.query('insert into construction_model_files(id,tenant_id,project_id,package_scope_ids,request_key,request_hash,name,format,discipline,size_bytes,sha256,bytes,created_by) values($1::uuid,$2::uuid,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,$11,$12,$13::uuid)',
       [model.id, identity.company.id, project.id, JSON.stringify(packageScopeIds(project, input.workPackageId)), input.key, requestHash, name, format, model.discipline, model.size, sha256, Buffer.from(input.bytes), identity.user.id]);
     ledger.models.unshift(model); ledger.receipts.push({ actorId: identity.user.id, key: input.key, hash: requestHash, modelId: model.id });
-    await audit(identity, client, 'construction.model.uploaded', project.id, model.id, { name, sha256, size: model.size, componentCount: model.componentCount, workPackageId: model.workPackageId });
+    await audit(identity, client, 'construction.model.uploaded', project.id, model.id, { name, sha256, size: model.size, componentCount: model.componentCount, workPackageId: model.workPackageId, modelCode: model.modelCode, revision: model.revision });
     return { value: structuredClone(model) };
   }).catch((error: unknown) => {
     if (error instanceof Error && 'code' in error && error.code === 'P0001' && error.message === 'Company model storage limit reached') throw new ConstructionModelError('This company has reached its model storage limit.', 413);
@@ -124,6 +131,30 @@ export async function readConstructionModel(id: string): Promise<{ model: Stored
     return { value: { model: structuredClone(model), bytes: await bytesFor(client, identity, model) }, commit: false };
   });
 }
+export async function readConstructionMesh(id: string): Promise<{ model: StoredModel; elements: MeshElement[] }> {
+  const { model, bytes } = await readConstructionModel(id);
+  try { return { model, elements: await meshFor(bytes, model.name) }; }
+  catch (error) { throw new ConstructionModelError(error instanceof Error ? error.message : 'Model geometry is unavailable.', 422); }
+}
+export async function compareConstructionRevisions(input: { beforeId: string; afterId: string; toleranceMm: number }) {
+  if (!uuid(input.beforeId) || !uuid(input.afterId) || input.beforeId === input.afterId) throw new ConstructionModelError('Choose two different revisions.');
+  if (!Number.isInteger(input.toleranceMm) || input.toleranceMm < 0 || input.toleranceMm > 1000) throw new ConstructionModelError('Choose a tolerance from 0 to 1,000 mm.');
+  const identity = await principal(false);
+  const source = await inWorkspace(identity, async (client) => {
+    const rows = [input.beforeId, input.afterId].map((id) => registry().models.find((row) => row.id === id && visible(identity.actor, row)));
+    const [before, after] = rows;
+    if (!before || !after || before.projectId !== after.projectId || ((before.modelCode || after.modelCode) && before.modelCode !== after.modelCode))
+      throw new ConstructionModelError('Choose revisions of one visible model in the same project and package.', 404);
+    if (before.workPackageId !== after.workPackageId) throw new ConstructionModelError('Model revisions must use the same work package.', 400);
+    return { value: { before, after, beforeBytes: await bytesFor(client, identity, before), afterBytes: await bytesFor(client, identity, after) }, commit: false };
+  });
+  try {
+    const changes = compareModelRevisions(await meshFor(source.beforeBytes, source.before.name), await meshFor(source.afterBytes, source.after.name), input.toleranceMm);
+    return { before: source.before, after: source.after, toleranceMm: input.toleranceMm, changes,
+      added: changes.filter((row) => row.kind === 'added').length, removed: changes.filter((row) => row.kind === 'removed').length,
+      changed: changes.filter((row) => row.kind === 'geometry_changed').length };
+  } catch (error) { throw new ConstructionModelError(error instanceof Error ? error.message : 'Revision geometry comparison failed.', 422); }
+}
 export async function detectConstructionClashes(input: { expectedCompanyId: string; projectId: string; modelAId: string; modelBId: string; toleranceMm: number }): Promise<ClashRun> {
   const identity = await principal(true);
   if (identity.company.id !== input.expectedCompanyId) throw new ConstructionModelError('Your company changed. Reopen coordination.', 409);
@@ -137,8 +168,8 @@ export async function detectConstructionClashes(input: { expectedCompanyId: stri
     const b = ledger.models.find((row) => row.id === input.modelBId && row.projectId === project.id && visible(identity.actor, row, 'create'));
     if (!a || !b) throw new ConstructionModelError('Both models must be in your assigned project and package.', 404);
     if (a.workPackageId && b.workPackageId && a.workPackageId !== b.workPackageId && identity.actor.constructionPackageIds !== undefined) throw new ConstructionModelError('This comparison spans packages outside a single assignment.', 403);
-    let candidates: ReturnType<typeof compareModels>;
-    try { candidates = compareModels(await componentsFor(await bytesFor(client, identity, a), a.name), await componentsFor(await bytesFor(client, identity, b), b.name), input.toleranceMm); }
+    let candidates: ReturnType<typeof compareMeshSurfaces>;
+    try { candidates = compareMeshSurfaces(await meshFor(await bytesFor(client, identity, a), a.name), await meshFor(await bytesFor(client, identity, b), b.name), input.toleranceMm); }
     catch (error) { throw new ConstructionModelError(error instanceof Error ? error.message : 'Could not compare model geometry.'); }
     const runId = randomUUID(), at = operatingNowISO();
     // A cross-package issue must not reveal another package's component name
@@ -156,11 +187,11 @@ export async function detectConstructionClashes(input: { expectedCompanyId: stri
         location: `${candidate.point.map((value) => value.toFixed(2)).join(', ')} m`, sourceReference: `${a.name} · ${candidate.a.id}`.slice(0, 160),
         relatedReference: `${b.name} · ${candidate.b.id}`.slice(0, 160), workPackageId: scope,
         clashDetection: { runId, modelAId: a.id, modelBId: b.id, componentAId: candidate.a.id, componentBId: candidate.b.id,
-          point: candidate.point as Point3, overlapMm: candidate.overlapMm, method: 'component_envelope_v1' } };
+          point: candidate.point as Point3, overlapMm: 0, clearanceMm: candidate.clearanceMm, intersects: candidate.intersects, method: 'triangle_surface_v1' } };
       db.constructionIssues.unshift(issue); created++;
     }
     const result: ClashRun = { id: runId, projectId: project.id, modelAId: a.id, modelBId: b.id, toleranceMm: input.toleranceMm,
-      compared: a.componentCount * b.componentCount, candidates: candidates.length, created, runBy: identity.user.id, runAtISO: at, method: 'component_envelope_v1' };
+      compared: a.componentCount * b.componentCount, candidates: candidates.length, created, runBy: identity.user.id, runAtISO: at, method: 'triangle_surface_v1' };
     ledger.runs.unshift(result); if (ledger.runs.length > 100) ledger.runs.length = 100;
     await audit(identity, client, 'construction.model.clash_scan', project.id, runId, { modelAId: a.id, modelBId: b.id, toleranceMm: input.toleranceMm, candidates: candidates.length, created });
     return { value: structuredClone(result) };

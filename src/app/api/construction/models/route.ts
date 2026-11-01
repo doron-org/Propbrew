@@ -7,7 +7,8 @@ export const runtime = 'nodejs';
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
 const failure = (error: unknown) => error instanceof ConstructionModelError ? reply({ error: error.message }, error.status) : reply({ error: 'Model storage is unavailable. The file was not saved.' }, 503);
 const schema = z.object({ expectedCompanyId: z.string().uuid(), projectId: z.string().min(1).max(200),
-  workPackageId: z.string().min(1).max(200).optional(), discipline: z.string().trim().min(2).max(80) }).strict();
+  workPackageId: z.string().min(1).max(200).optional(), discipline: z.string().trim().min(2).max(80),
+  modelCode: z.string().trim().min(2).max(60).optional(), revision: z.string().trim().min(1).max(30).optional() }).strict();
 
 export async function POST(request: Request) {
   if (!nativeRequestOriginAllowed(request)) return reply({ error: 'Upload from your Propbrew workspace.' }, 403);
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     }
     const form = await new Response(Buffer.concat(chunks), { headers: { 'Content-Type': contentType } }).formData();
     const keys = [...form.keys()];
-    if (keys.some((key) => !['expectedCompanyId', 'projectId', 'workPackageId', 'discipline', 'file'].includes(key)) || new Set(keys).size !== keys.length) return reply({ error: 'Provide one model and its project details.' }, 400);
+    if (keys.some((key) => !['expectedCompanyId', 'projectId', 'workPackageId', 'discipline', 'modelCode', 'revision', 'file'].includes(key)) || new Set(keys).size !== keys.length) return reply({ error: 'Provide one model and its project details.' }, 400);
     const file = form.get('file'), parsed = schema.safeParse(Object.fromEntries([...form.entries()].filter(([key]) => key !== 'file')));
     if (!parsed.success || !(file instanceof File) || file.size < 32 || file.size > MODEL_MAX_BYTES) return reply({ error: 'Choose a valid IFC, OBJ or GLB model of at most 12 MB.' }, 400);
     const model = await storeConstructionModel({ ...parsed.data, key: request.headers.get('Idempotency-Key') ?? '', name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
