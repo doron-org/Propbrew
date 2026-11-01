@@ -37,6 +37,11 @@ export function proxy(request: NextRequest, event: Parameters<typeof clerkProxy>
   if (release.kind === 'redirect') return NextResponse.redirect(new URL(release.location, request.url), release.status);
   if (websiteOnlyEnabled(process.env.PROPBREW_WEBSITE_ONLY, process.env.NODE_ENV)) return NextResponse.next();
   const pathname = request.nextUrl.pathname;
+  if (pathname === '/' && (request.method === 'GET' || request.method === 'HEAD')) {
+    const response = NextResponse.redirect(new URL('/login', request.url), 307);
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
+  }
   if (pathname.startsWith('/_next/static/') || pathname === '/_next/image' || pathname.startsWith('/brand/') || pathname === '/icon.svg' || pathname === '/favicon.ico') return NextResponse.next();
   if (nativeAuthEnabled()) {
     if (pathname.startsWith('/review/')) return new NextResponse('Not found',{status:404});
