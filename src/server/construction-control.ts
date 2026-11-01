@@ -9,6 +9,8 @@ export function constructionControl(tenantId: string): ConstructionControlState 
   const state = states[tenantId] ??= emptyConstructionControlState();
   state.handoverPacks ??= [];
   state.bankDebits ??= [];
+  state.fieldCheckIns ??= [];
+  state.mobileUploads ??= [];
   state.retentionReleases ??= [];
   return state;
 }

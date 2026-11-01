@@ -17,12 +17,14 @@ export type WorkerRow = {
   dayRateMinor: number; certName?: string; certExpiryISO?: string; certDays: number | null; certBand: Tone;
   status: 'present' | 'absent' | 'pending'; method?: string; withinGeofence?: boolean; clockIn?: string;
 };
+type CheckInRow = { id: string; actorName: string; siteName: string; capturedAtISO: string; distanceMeters: number; accuracyMeters: number };
 
 const KIND_TONE: Record<string, Tone> = { employee: 'success', subcontractor: 'info', temp: 'muted' };
 const displayDate = (value: string) => new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Lagos' });
 
-export function WorkforceWorkspace({ workers, byTrade, kpis, projectName, projectId, canMutate }: {
+export function WorkforceWorkspace({ workers, checkIns = [], byTrade, kpis, projectName, projectId, canMutate }: {
   workers: WorkerRow[]; byTrade: { trade: string; present: number; total: number }[];
+  checkIns?: CheckInRow[];
   kpis: { present: number; planned: number; shortfall: number; dayCostMinor: number; certAlerts: number };
   projectName: string; projectId: string; canMutate: boolean;
 }) {
@@ -70,6 +72,12 @@ export function WorkforceWorkspace({ workers, byTrade, kpis, projectName, projec
       <PageTabs label="Construction workforce sections" items={[
         {
           id: 'attendance', label: 'Attendance', content: <div className={styles.stack}>
+            <ConstructionPanel>
+              <div className={styles.header}><CardHeader title="Device location check-ins" subtitle="Today · separate from the manual crew register. Device location can be spoofed; review before payroll or access decisions." /></div>
+              <div className={`${styles.body} ${styles.stack}`}>
+                {checkIns.length ? <ul className={styles.list} aria-label="Location-attested site check-ins">{checkIns.map((row) => <li className={styles.listEntry} key={row.id}><div><strong>{row.actorName}</strong><p className={styles.metadata}>{row.siteName} · {new Date(row.capturedAtISO).toLocaleString('en-NG', { timeZone: 'Africa/Lagos', dateStyle: 'medium', timeStyle: 'short' })} WAT</p><p className={styles.metadata}>{row.distanceMeters} m from site · ±{Math.round(row.accuracyMeters)} m device accuracy</p></div><StatusPill status="Location attested" tone="info" /></li>)}</ul> : <p className={styles.text}>No site check-ins today. Assigned field staff can check in from the native app after site coordinates are configured.</p>}
+              </div>
+            </ConstructionPanel>
             <ConstructionSearch label="Search construction workers" value={query} onChange={setQuery} count={shown.length} />
             <ConstructionPanel >
               <div className={styles.header}><CardHeader title="Attendance register" subtitle="Recorded roster and capture method · all manual attendance changes require review" /></div>

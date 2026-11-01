@@ -36,7 +36,9 @@ export default async function ConstructionOperationsPage() {
     return <div className="pb-page"><ConstructionOperationsWorkspace
       projects={projects}
       subcontractors={[...onboardedSubcontractors, ...seededSubcontractors]}
-      evidence={visible(state.evidencePacks).map((row) => ({ id: row.id, projectId: row.projectId, project: projectName(row.projectId), subject: row.subject, subjectRef: row.subjectRef, title: row.title, fileCount: row.mediaRefs.length, sha256: row.sha256, status: row.status, capturedAtISO: row.capturedAtISO }))}
+      evidence={visible(state.evidencePacks).map((row) => ({ id: row.id, projectId: row.projectId, project: projectName(row.projectId), subject: row.subject, subjectRef: row.subjectRef, title: row.title, fileCount: row.mediaRefs.length, sha256: row.sha256, status: row.status, capturedAtISO: row.capturedAtISO,
+        reviewableIndices: row.mediaRefs.flatMap((url, index) => state.mobileUploads.some((upload) => upload.url === url && upload.projectId === row.projectId && upload.taskId === row.subjectRef && upload.actorId === row.capturedBy) ? [index] : []),
+      }))}
       fieldApprovals={visible(state.fieldApprovals).map((row) => ({ id: row.id, projectId: row.projectId, project: projectName(row.projectId), kind: row.kind, subjectRef: row.subjectRef, title: row.title, summary: row.summary, evidenceCount: row.evidencePackIds.length, status: row.status, requestedAtISO: row.requestedAtISO }))}
       handoverDocs={world.docs.filter((row) => constructionDrawingVisible(actor, row)).map((row) => ({ id: row.id, projectId: row.projectId, number: row.number, title: row.title, revision: row.revision, status: row.status, hasFile: Boolean(row.fileId && row.fileSha256) }))}
       handoverPacks={visible(state.handoverPacks).map((row) => ({ id: row.id, ref: row.ref, projectId: row.projectId, project: projectName(row.projectId), title: row.title, status: row.status, approvalId: row.approvalId, items: row.items.map((item) => ({ requirement: item.requirement, docId: item.docId })), omissions: handoverOmissions(row, world.docs), createdAtISO: row.createdAtISO }))}

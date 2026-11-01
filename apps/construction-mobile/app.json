@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Propbrew Construction Field",
+    "slug": "propbrew-construction-field",
+    "scheme": "propbrew-field",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.propbrew.constructionfield",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Capture evidence photos for assigned construction tasks.",
+        "NSLocationWhenInUseUsageDescription": "Record a device location check-in at your assigned construction site.",
+        "NSPhotoLibraryUsageDescription": "Attach a site photo to an assigned task."
+      }
+    },
+    "android": {
+      "package": "com.propbrew.constructionfield",
+      "minSdkVersion": 26,
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "plugins": ["expo-secure-store", "expo-image-picker", "expo-location"],
+    "platforms": ["ios", "android"],
+    "extra": { "apiUrl": "https://usepropbrew.com" }
+  }
+}

@@ -14,6 +14,7 @@ import { scopedConstructionProjectGet, scopedConstructionTaskGet, scopedMutableG
 import { money } from '@/domain/primitives';
 import { createHash } from 'node:crypto';
 import { constructionControl } from '@/server/construction-control';
+import { assessFieldCheckIn } from '@/domain/construction/field-check-in';
 
 import { outboxOwnerKey, type OpKind, type SyncOutcome } from '@/domain/sync';
 import { syncFingerprint, syncInputSchema } from '@/server/sync-validation';
@@ -25,7 +26,7 @@ export type SyncInput = { id: string; owner: string; kind: OpKind; capturedISO: 
 function permitted(actor: Actor, kind: OpKind): boolean {
   if (!actor.tenantId || !canEnterWorkspace(actor, 'construction')) return false;
   if (actor.companyAccess?.operationalProfileId === 'construction-field-worker'
-    && !['task_progress', 'safety_event', 'evidence_pack'].includes(kind)) return false;
+    && !['task_progress', 'safety_event', 'evidence_pack', 'field_check_in'].includes(kind)) return false;
   try { assertCan(actor, 'reports_analytics', kind === 'task_progress' ? 'update' : 'create'); return true; }
   catch (e) { if (e instanceof ForbiddenError) return false; throw e; }
 }
@@ -95,6 +96,21 @@ export async function syncOperation(raw: SyncInput): Promise<SyncOutcome> {
       if (existing) return conflict(`${p.workerId} already has an attendance record for ${p.dateISO}.`, `${existing.status} · ${existing.method}`);
       db.constructionAttendance.unshift({ tenantId: project.tenantId, id: rowId, workerId: p.workerId, projectId: p.projectId, dateISO: p.dateISO, status: p.status, method: 'offline', withinGeofence: false, clockIn: p.status === 'present' ? p.clockIn : undefined, hours: 0, overtime: 0 });
       ref = `${p.workerId} · ${p.dateISO}`; break;
+    }
+    case 'field_check_in': {
+      const p = input.payload;
+      const assessment = assessFieldCheckIn(p, input.capturedISO, new Date().toISOString(), project.mobilisation?.locations ?? []);
+      if (!assessment.ok) return conflict(assessment.error, 'No site check-in recorded');
+      const state = constructionControl(actor.tenantId!);
+      const prior = state.fieldCheckIns.find((row) => row.actorId === actor.userId && row.projectId === project.id && row.dateISO === assessment.dateISO);
+      if (prior) return conflict('You already checked in to this project today.', `${prior.dateISO} · location attested`);
+      state.fieldCheckIns.unshift({
+        tenantId: project.tenantId, id: rowId, projectId: project.id, actorId: actor.userId,
+        siteLocationId: assessment.siteLocationId, dateISO: assessment.dateISO,
+        capturedAtISO: input.capturedISO, distanceMeters: assessment.distanceMeters,
+        accuracyMeters: p.accuracyMeters, method: 'device_location_attested',
+      });
+      ref = `Site check-in · ${assessment.dateISO}`; break;
     }
     case 'material_request': {
       const p = input.payload;

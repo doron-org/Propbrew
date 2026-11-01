@@ -13,6 +13,7 @@ export type OpKind =
   | 'daily_report'
   | 'site_issue'
   | 'attendance'
+  | 'field_check_in'
   | 'material_request'
   | 'task_progress'
   | 'safety_event'

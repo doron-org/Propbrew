@@ -5,8 +5,10 @@ import { operatingClock } from '@/server/operating-clock';
 import { attendanceSummary, labourCostMinor, certBand } from '@/domain/construction';
 import { WorkforceWorkspace, type WorkerRow } from '@/components/construction/workforce-workspace';
 import { withDurableRead } from '@/server/data/durable-records';
+import { constructionControl } from '@/server/construction-control';
+import { db } from '@/server/data/store';
 
-/** Workforce — today's geofenced attendance board, trade mix vs allocation,
+/** Workforce — recorded attendance and separate device location attestations, trade mix vs allocation,
  *  labour cost for the day, and a certification-expiry watch that surfaces a
  *  lapsing ticket before it blocks certified work. */
 export default async function ConstructionWorkforcePage() {
@@ -22,6 +24,12 @@ export default async function ConstructionWorkforcePage() {
   for (const w of world.workers) if (w.projectId) counts.set(w.projectId, (counts.get(w.projectId) ?? 0) + 1);
   const projectId = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? world.projects[0]?.id ?? '';
   const project = world.projects.find((p) => p.id === projectId);
+  const checkInDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const checkIns = constructionControl(actor.tenantId!).fieldCheckIns
+    .filter((row) => row.projectId === projectId && row.dateISO === checkInDate && (actor.companyAccess?.operationalProfileId !== 'construction-field-worker' || row.actorId === actor.userId))
+    .map((row) => ({ id: row.id, actorName: db.users.find((user) => user.id === row.actorId && user.tenantId === actor.tenantId)?.name ?? 'Site team member',
+      siteName: project?.mobilisation?.locations.find((site) => site.id === row.siteLocationId)?.name ?? 'Configured site',
+      capturedAtISO: row.capturedAtISO, distanceMeters: row.distanceMeters, accuracyMeters: row.accuracyMeters }));
 
   const crew = world.workers.filter((w) => w.projectId === projectId);
   const att = attendanceSummary(world.attendance, world.workers, projectId, today);
@@ -48,6 +56,7 @@ export default async function ConstructionWorkforcePage() {
     <div className="pb-page">
       <WorkforceWorkspace
         workers={workers}
+        checkIns={checkIns}
         byTrade={[...trades.entries()].map(([trade, v]) => ({ trade, ...v })).sort((a, b) => b.total - a.total)}
         projectName={project?.name ?? 'Site'}
         projectId={projectId}

@@ -47,6 +47,15 @@ export type ConstructionBankDebit = {
   importedBy: string; importedAtISO: string; status: 'pending_review' | 'approved' | 'rejected';
   reviewedBy?: string; reviewedAtISO?: string;
 };
+export type ConstructionFieldCheckIn = {
+  tenantId: string; id: string; projectId: string; actorId: string; siteLocationId: string;
+  dateISO: string; capturedAtISO: string; distanceMeters: number; accuracyMeters: number;
+  method: 'device_location_attested';
+};
+export type ConstructionMobileUpload = {
+  tenantId: string; opId: string; actorId: string; projectId: string; taskId: string;
+  index: number; url: string; contentType: string; size: number; sha256: string;
+};
 export type ConstructionRetentionRelease = {
   tenantId: string; id: string; claimId: string; projectId: string; ref: string; amountMinor: number;
   reason: string; status: 'requested' | 'approved' | 'rejected' | 'paid'; requestedBy: string; requestedAtISO: string;
@@ -69,11 +78,13 @@ export type ConstructionControlState = {
   payments: ProcurementPayment[];
   handoverPacks: ConstructionHandoverPack[];
   bankDebits: ConstructionBankDebit[];
+  fieldCheckIns: ConstructionFieldCheckIn[];
+  mobileUploads: ConstructionMobileUpload[];
   retentionReleases: ConstructionRetentionRelease[];
 };
 
 export function emptyConstructionControlState(): ConstructionControlState {
-  return { subcontractors: [], evidencePacks: [], fieldApprovals: [], claims: [], payments: [], handoverPacks: [], bankDebits: [], retentionReleases: [] };
+  return { subcontractors: [], evidencePacks: [], fieldApprovals: [], claims: [], payments: [], handoverPacks: [], bankDebits: [], fieldCheckIns: [], mobileUploads: [], retentionReleases: [] };
 }
 
 export function handoverOmissions(pack: ConstructionHandoverPack, docs: readonly { id: string; projectId: string; number: string; revision: string; status: string; fileId?: string; fileSha256?: string }[]) {

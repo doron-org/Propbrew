@@ -22,6 +22,10 @@ export const syncInputSchema = z.discriminatedUnion('kind', [
   z.strictObject({ ...envelope, kind: z.literal('attendance'), payload: z.strictObject({
     ...common, workerId: identifier, dateISO: date, status: z.enum(['present', 'absent', 'pending']), clockIn: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   }) }),
+  z.strictObject({ ...envelope, kind: z.literal('field_check_in'), payload: z.strictObject({
+    projectId: identifier, latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180),
+    accuracyMeters: z.number().finite().positive().max(1000), locationAtISO: z.iso.datetime({ offset: true }),
+  }) }),
   z.strictObject({ ...envelope, kind: z.literal('material_request'), payload: z.strictObject({
     ...common, item: text, qty: z.number().positive().max(Number.MAX_SAFE_INTEGER), unit: text, costCode: identifier,
     estimateNaira: z.number().nonnegative().max(Number.MAX_SAFE_INTEGER / 100).refine((n) => Number.isSafeInteger(Math.round(n * 100))), requiredISO: date, justification: text,

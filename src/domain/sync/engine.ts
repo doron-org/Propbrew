@@ -83,6 +83,7 @@ export const OP_LABEL: Record<OpKind, string> = {
   daily_report: 'Daily report',
   site_issue: 'Site issue',
   attendance: 'Attendance',
+  field_check_in: 'Site check-in',
   material_request: 'Material request',
   task_progress: 'Task progress',
   safety_event: 'Safety event',

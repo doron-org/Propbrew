@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { identityByKey } from '@/server/identities';
 import { db } from '@/server/data/store';
 import { outboxOwnerKey } from '@/domain/sync';
+import { constructionControl } from '@/server/construction-control';
 import type { TenantId } from '@/domain/ids';
 
 const boundary = vi.hoisted(() => ({ getActor: vi.fn(), revalidatePath: vi.fn() }));
@@ -127,6 +128,24 @@ describe('strict offline payloads and scoped relationships', () => {
 });
 
 describe('offline transitions match online safety rules', () => {
+  it('records an idempotent site check-in separately from manual attendance', async () => {
+    const actor = { ...manager, userId: 'native-field-check-in-test' };
+    boundary.getActor.mockResolvedValue(actor);
+    const p = project();
+    p.mobilisation = { calendar: { name: 'Site', workingDays: [1, 2, 3, 4, 5], hoursPerDay: 8, timeZone: 'Africa/Lagos', holidays: [] }, baselines: [], team: [], workPackages: [],
+      locations: [{ id: 'site-native-test', name: 'Site', kind: 'site', latitude: 6.5244, longitude: 3.3792 }], parties: [], lifecycle: [] };
+    const now = new Date().toISOString();
+    const op: SyncInput = { id: 'native-site-check-in-1', owner: outboxOwnerKey(actor.tenantId, actor.userId)!, kind: 'field_check_in', capturedISO: now,
+      payload: { projectId: p.id, latitude: 6.5244, longitude: 3.3792, accuracyMeters: 12, locationAtISO: now } };
+    const beforeAttendance = db.constructionAttendance.length;
+    expect(await syncOperation(op)).toMatchObject({ ok: true, duplicate: false });
+    expect(await syncOperation(op)).toMatchObject({ ok: true, duplicate: true });
+    expect(await syncOperation({ ...op, id: 'native-site-check-in-2' })).toMatchObject({ ok: false, conflict: true });
+    const checkIns = constructionControl(actor.tenantId!).fieldCheckIns.filter((row) => row.actorId === actor.userId && row.projectId === p.id);
+    expect(checkIns).toHaveLength(1);
+    expect(checkIns[0]).toMatchObject({ method: 'device_location_attested', siteLocationId: 'site-native-test', accuracyMeters: 12 });
+    expect(db.constructionAttendance).toHaveLength(beforeAttendance);
+  });
   it('does not reopen completed work or bypass unfinished dependencies', async () => {
     const row = task(); row.status = 'done'; row.percentComplete = 100;
     expect(await syncOperation(input('task_progress', { taskId: row.id, percentComplete: 0 }))).toMatchObject({ ok: false, conflict: true });
