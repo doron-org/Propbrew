@@ -24,12 +24,12 @@ export type RetentionView = { id: string; ref: string; claimId: string; projectI
 const money = (minor: number) => `₦${(minor / 100).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const tone = (status: string) => status === 'approved' || status === 'paid' ? 'success' : status === 'rejected' ? 'danger' : 'warn';
 
-export function ConstructionHandoverAndCloseout({ view, projects, docs, approvals, packs, claims, releases, canCreate, canUpdate, onDone }: {
+export function ConstructionHandoverAndCloseout({ view, projects, docs, approvals, packs, claims, releases, canCreate, canUpdate, canTransition, onDone }: {
   view: 'handover' | 'closeout'; projects: Project[]; docs: HandoverDoc[]; approvals: Approval[]; packs: HandoverPackView[];
-  claims: ClaimView[]; releases: RetentionView[]; canCreate: boolean; canUpdate: boolean; onDone: (message: string) => void;
+  claims: ClaimView[]; releases: RetentionView[]; canCreate: boolean; canUpdate: boolean; canTransition: boolean; onDone: (message: string) => void;
 }) {
   return view === 'handover'
-    ? <Handover projects={projects} docs={docs} approvals={approvals} packs={packs} canCreate={canCreate} canUpdate={canUpdate} onDone={onDone} />
+    ? <Handover projects={projects} docs={docs} approvals={approvals} packs={packs} canCreate={canCreate} canUpdate={canUpdate} canTransition={canTransition} onDone={onDone} />
     : <Closeout claims={claims} releases={releases} canCreate={canCreate} canUpdate={canUpdate} onDone={onDone} />;
 }
 
@@ -41,7 +41,7 @@ function Action({ label, run, disabled, onDone }: { label: string; run: () => Pr
   })}>{pending ? 'Working…' : label}</Button>;
 }
 
-function Handover({ projects, docs, approvals, packs, canCreate, canUpdate, onDone }: { projects: Project[]; docs: HandoverDoc[]; approvals: Approval[]; packs: HandoverPackView[]; canCreate: boolean; canUpdate: boolean; onDone: (message: string) => void }) {
+function Handover({ projects, docs, approvals, packs, canCreate, canUpdate, canTransition, onDone }: { projects: Project[]; docs: HandoverDoc[]; approvals: Approval[]; packs: HandoverPackView[]; canCreate: boolean; canUpdate: boolean; canTransition: boolean; onDone: (message: string) => void }) {
   const router = useRouter();
   const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
   const [packId, setPackId] = useState(''); const [title, setTitle] = useState('Project handover pack');
@@ -72,7 +72,7 @@ function Handover({ projects, docs, approvals, packs, canCreate, canUpdate, onDo
     <Card><CardHeader title="Handover register" subtitle="Document completeness is checked again at submission and sign-off" />
       <div className={styles.stack}>{packs.length ? packs.map((pack) => <div key={pack.id} className={styles.listEntry}><div><strong>{pack.ref} · {pack.title}</strong><p className={styles.metadata}>{pack.project} · {pack.items.length}/{HANDOVER_REQUIREMENTS.length} slots filled</p><StatusPill status={pack.status} tone={tone(pack.status)} />
         {pack.omissions.length ? <ul className={styles.list}>{pack.omissions.map((issue) => <li key={issue}>{issue}</li>)}</ul> : <p className={styles.metadata}><FileCheck2 size={14} aria-hidden="true" /> All required approved files present</p>}
-      </div><div className={styles.actions}>{pack.status === 'draft' ? <><Button onClick={() => load(pack)}>Edit</Button><Action label="Submit" disabled={!canUpdate || Boolean(pack.omissions.length) || !pack.approvalId} run={() => submitConstructionHandoverPack(pack.id)} onDone={onDone} /></> : null}{pack.status === 'submitted' ? <Action label="Sign off" disabled={!canUpdate || Boolean(pack.omissions.length)} run={() => approveConstructionHandoverPack(pack.id)} onDone={onDone} /> : null}{pack.status === 'approved' ? <a className={styles.link} href={`/api/construction/handover/${encodeURIComponent(pack.id)}`}>Download signed pack ZIP →</a> : null}</div></div>) : <p className={styles.text}>No handover packs assembled yet.</p>}</div>
+      </div><div className={styles.actions}>{pack.status === 'draft' ? <><Button onClick={() => load(pack)}>Edit</Button><Action label="Submit" disabled={!canUpdate || Boolean(pack.omissions.length) || !pack.approvalId} run={() => submitConstructionHandoverPack(pack.id)} onDone={onDone} /></> : null}{pack.status === 'submitted' ? <Action label="Sign off" disabled={!canTransition || Boolean(pack.omissions.length)} run={() => approveConstructionHandoverPack(pack.id)} onDone={onDone} /> : null}{pack.status === 'approved' ? <a className={styles.link} href={`/api/construction/handover/${encodeURIComponent(pack.id)}`}>Download signed pack ZIP →</a> : null}</div></div>) : <p className={styles.text}>No handover packs assembled yet.</p>}</div>
     </Card>
   </div>;
 }

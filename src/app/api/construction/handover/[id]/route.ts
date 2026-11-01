@@ -23,13 +23,15 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       const selected = pack.items.map((item) => ({ item, doc: docs.find((row) => row.id === item.docId && row.projectId === pack.projectId) }));
       if (selected.some((row) => !row.doc || !constructionDrawingVisible(actor, row.doc))) return null;
       if (selected.reduce((sum, row) => sum + (row.doc?.fileSizeBytes ?? 0), 0) > 49_000_000) throw new Error('Handover archive exceeds the download limit.');
-      return { ref: pack.ref, title: pack.title, projectId: pack.projectId, approvedAtISO: pack.approvedAtISO,
+      return { ref: pack.ref, title: pack.title, projectId: pack.projectId, approvalId: pack.approvalId,
+        submittedBy: pack.submittedBy, submittedAtISO: pack.submittedAtISO, approvedBy: pack.approvedBy, approvedAtISO: pack.approvedAtISO,
         files: selected.map(({ item, doc }) => ({ requirement: item.requirement, number: item.number, revision: item.revision, sha256: item.fileSha256, fileId: doc!.fileId! })) };
     });
     if (!data) return new Response(null, { status: 404 });
     const files = await Promise.all(data.files.map(async (row) => ({ ...row, file: await readConstructionDrawing(row.fileId) })));
     const safeFilename = (row: typeof files[number]) => `${row.requirement}-${row.number}-rev-${row.revision}.pdf`.replace(/[^A-Za-z0-9_.-]/g, '_');
     const manifest = { ref: data.ref, title: data.title, projectId: data.projectId, approvedAtISO: data.approvedAtISO,
+      signOff: { submittedBy: data.submittedBy, submittedAtISO: data.submittedAtISO, approvedBy: data.approvedBy, approvedAtISO: data.approvedAtISO, fieldApprovalId: data.approvalId },
       documents: files.map((row) => ({ requirement: HANDOVER_REQUIREMENTS.find((entry) => entry.key === row.requirement)?.label, number: row.number, revision: row.revision, sha256: row.sha256, filename: safeFilename(row) })) };
     const entries = [{ name: 'manifest.json', bytes: new TextEncoder().encode(JSON.stringify(manifest, null, 2)) },
       ...files.map((row) => ({ name: safeFilename(row), bytes: row.file.bytes }))];

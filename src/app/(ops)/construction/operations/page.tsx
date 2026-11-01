@@ -51,6 +51,7 @@ export default async function ConstructionOperationsPage() {
       forecastEvaluation={constructionForecastEvaluation(actor)}
       canCreate={can(actor, 'reports_analytics', 'create').allowed}
       canUpdate={can(actor, 'reports_analytics', 'update').allowed}
+      canTransition={can(actor, 'reports_analytics', 'transition').allowed}
     /></div>;
   });
 }
