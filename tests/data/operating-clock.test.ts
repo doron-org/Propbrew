@@ -30,7 +30,7 @@ describe('native company operating time', () => {
     boundary.actor.mockResolvedValue(actor);
     const state = blankCompanyWorkspaceState();
     await runWithRecordContext({ state, domainTenantId: tenant, mode: 'write' }, async () => {
-      expect((await createProject({ name: 'Own company project', location: 'Abuja', clientName: '', contractNaira: 100, budgetNaira: 90, plannedFinishISO: '2027-01-01' })).ok).toBe(true);
+      expect((await createProject({ name: 'Own company project', location: 'Abuja', clientName: '', contractNaira: 100, budgetNaira: 90, plannedFinishISO: '2027-01-01', projectType: 'commercial', region: 'FCT, Nigeria' })).ok).toBe(true);
       expect(db.constructionProjects[0]).toMatchObject({ tenantId: tenant, startISO: '2026-10-25', clientName: 'Not recorded' });
       expect(JSON.stringify(db.constructionProjects[0])).not.toContain('7 Fifteen');
     });

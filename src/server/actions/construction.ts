@@ -40,6 +40,7 @@ import { getCompanyPrincipal } from '@/server/auth/company';
 import { nativeAuthEnabled } from '@/server/auth/mode';
 import { pushNotification } from '@/server/data/inbox';
 import type { RFI, RFIActivity } from '@/domain/construction/types';
+import { CONSTRUCTION_PROJECT_TYPES, type ConstructionProjectType } from '@/domain/construction/forecast-evaluation';
 import { canRecordQualitySignOff } from '@/server/construction/quality-access';
 
 export type Res = { ok: true; ref?: string } | { ok: false; error: string };
@@ -396,16 +397,18 @@ export async function reviewConstructionClash(id: string, disposition: 'confirme
 }
 
 /* --- projects ------------------------------------------------------------- */
-export type ProjectInput = { name: string; location: string; clientName: string; contractNaira: number; budgetNaira: number; plannedFinishISO: string };
+export type ProjectInput = { name: string; location: string; clientName: string; contractNaira: number; budgetNaira: number; plannedFinishISO: string; projectType: ConstructionProjectType; region: string };
 export async function createProject(input: ProjectInput): Promise<Res> {
   return withDurableMutation(async () => {
   const g = await gate('create'); if (!g.ok) return g;
   if (!input.name?.trim()) return { ok: false, error: 'Enter a project name.' };
+  const cohort = z.object({ projectType: z.enum(CONSTRUCTION_PROJECT_TYPES), region: z.string().trim().min(2).max(80) }).safeParse(input);
+  if (!cohort.success) return { ok: false, error: 'Choose a project type and enter a state or region for forecast evaluation.' };
   if (!Number.isFinite(input.contractNaira) || !safeMinor(Math.round(input.contractNaira * 100)) || !Number.isFinite(input.budgetNaira) || !safeMinor(Math.round(input.budgetNaira * 100))) return { ok: false, error: 'Enter finite, non-negative NGN contract and budget amounts.' };
   if (input.plannedFinishISO && (!validDate(input.plannedFinishISO) || input.plannedFinishISO < operatingDateISO())) return { ok: false, error: 'Choose a valid planned finish on or after the project start.' };
   const projSeq = nextRecordSequence('construction:projSeq', 0, true);
   const id = `cp-new-${projSeq}`;
-  db.constructionProjects.unshift({ tenantId: g.actor.tenantId, id, projectId: id, code: `NEW-${projSeq}`, name: input.name.trim(), location: input.location.trim() || 'Lagos', clientName: input.clientName.trim() || 'Not recorded', pmName: nameOf(g.actor), status: 'planning', contractValue: money(Math.round((input.contractNaira || 0) * 100)), approvedBudget: money(Math.round((input.budgetNaira || 0) * 100)), startISO: operatingDateISO(), plannedFinishISO: input.plannedFinishISO || daysISO(operatingDateISO(), 540), plannedPercent: 0, percentComplete: 0 } as (typeof db.constructionProjects)[number]);
+  db.constructionProjects.unshift({ tenantId: g.actor.tenantId, id, projectId: id, code: `NEW-${projSeq}`, name: input.name.trim(), location: input.location.trim() || 'Lagos', clientName: input.clientName.trim() || 'Not recorded', projectType: cohort.data.projectType, region: cohort.data.region, pmName: nameOf(g.actor), status: 'planning', contractValue: money(Math.round((input.contractNaira || 0) * 100)), approvedBudget: money(Math.round((input.budgetNaira || 0) * 100)), startISO: operatingDateISO(), plannedFinishISO: input.plannedFinishISO || daysISO(operatingDateISO(), 540), plannedPercent: 0, percentComplete: 0 } as (typeof db.constructionProjects)[number]);
   revalidate(); return { ok: true, ref: input.name.trim() };
 
   }, 'construction');
@@ -422,6 +425,23 @@ export async function updateProjectDetails(id: string, input: { name: string; lo
     const before = JSON.stringify({ name: project.name, location: project.location, clientName: project.clientName });
     Object.assign(project, parsed.data);
     audit(g.actor, { action: 'override', entity: 'project_details', entityRef: project.code, projectId: project.id, summary: 'Updated project identity details', before, after: JSON.stringify(parsed.data) });
+    revalidate(); return { ok: true, ref: project.name };
+  }, 'construction');
+}
+
+/** Cohort metadata may be corrected after closeout; the audited change never alters
+ * the recorded forecast, outcome, programme or financial ledger. */
+export async function classifyProjectForForecast(id: string, input: { projectType: ConstructionProjectType; region: string }): Promise<Res> {
+  return withDurableMutation(async () => {
+    const g = await gate('update'); if (!g.ok) return g;
+    const parsed = z.object({ projectType: z.enum(CONSTRUCTION_PROJECT_TYPES), region: z.string().trim().min(2).max(80) }).strict().safeParse(input);
+    if (!parsed.success) return { ok: false, error: 'Choose a project type and enter a state or region.' };
+    const project = scopedConstructionProjectGet(g.actor, id, 'update');
+    if (!project) return { ok: false, error: 'Project not found.' };
+    const before = JSON.stringify({ projectType: project.projectType ?? null, region: project.region ?? null });
+    Object.assign(project, parsed.data);
+    audit(g.actor, { action: 'override', entity: 'project_forecast_cohort', entityRef: project.code, projectId: project.id,
+      summary: 'Updated project forecast cohort', before, after: JSON.stringify(parsed.data) });
     revalidate(); return { ok: true, ref: project.name };
   }, 'construction');
 }

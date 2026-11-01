@@ -10,12 +10,14 @@ import { useRouter } from 'next/navigation';
 import { Building2, Plus, Check, TrendingUp, Flag, ExternalLink, Pencil, ClipboardList } from 'lucide-react';
 import { humanizeStatus, toneVar, type Tone } from '@/lib/status-tones';
 
-import { createProject, updateProjectDetails, type ProjectInput } from '@/server/actions/construction';
+import { createProject, updateProjectDetails, classifyProjectForForecast, type ProjectInput } from '@/server/actions/construction';
+import { CONSTRUCTION_PROJECT_TYPES, type ConstructionProjectType } from '@/domain/construction/forecast-evaluation';
 import { PageTabs } from '@/components/ui/page-tabs';
 import { PageHeader } from '@/components/ui/page-header';
 
 export type ProjectCard = {
   id: string; name: string; code: string; location: string; clientName: string; pmName: string; status: string;
+  projectType?: ConstructionProjectType; region?: string;
   contractMinor: number; budgetMinor: number; committedMinor: number; actualMinor: number;
   percentComplete: number; plannedPercent: number; cpi: number; spi: number; healthScore: number; healthBand: Tone; healthLabel: string;
   startISO: string; plannedFinishISO: string; forecastFinishISO: string; slipDays: number;
@@ -33,6 +35,7 @@ export function ProjectsWorkspace({ projects, kpis, canMutate }: {
 }) {
   const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState<ProjectCard | null>(null);
+  const [classifying, setClassifying] = useState<ProjectCard | null>(null);
   const [query, setQuery] = useState('');
   const shown = projects.filter((project) => `${project.name} ${project.code} ${project.location} ${project.clientName} ${project.pmName}`.toLowerCase().includes(query.trim().toLowerCase()));
   const [toast, setToast] = useState<string | null>(null);
@@ -49,9 +52,9 @@ export function ProjectsWorkspace({ projects, kpis, canMutate }: {
             <div className={styles.stack}>
               {shown.map((p) => (
                 <ConstructionPanel key={p.id}>
-                  <div className={styles.header}><CardHeader title={p.name} subtitle={`${p.code} · ${p.location}`} action={<div className={styles.inline}>{canMutate && !['completed','closing'].includes(p.status) && <Button type="button" onClick={() => setEditing(p)} aria-label={`Edit project ${p.name}`}><Pencil size={14} aria-hidden="true" />Edit</Button>}<StatusPill status={humanizeStatus(p.status)} tone={STATUS_TONE[p.status] ?? 'muted'} /><HealthRing score={p.healthScore} band={p.healthBand} label={p.healthLabel} /></div>} /></div>
+                  <div className={styles.header}><CardHeader title={p.name} subtitle={`${p.code} · ${p.location}`} action={<div className={styles.inline}>{canMutate && !['completed','closing'].includes(p.status) && <Button type="button" onClick={() => setEditing(p)} aria-label={`Edit project ${p.name}`}><Pencil size={14} aria-hidden="true" />Edit</Button>}{canMutate && <Button type="button" onClick={() => setClassifying(p)} aria-label={`Classify project ${p.name}`}>Forecast cohort</Button>}<StatusPill status={humanizeStatus(p.status)} tone={STATUS_TONE[p.status] ?? 'muted'} /><HealthRing score={p.healthScore} band={p.healthBand} label={p.healthLabel} /></div>} /></div>
                   <div className={`${styles.body} ${styles.stack}`}>
-                  <dl className={styles.facts}><div><dt>Client</dt><dd>{p.clientName}</dd></div><div><dt>Project manager</dt><dd>{p.pmName}</dd></div></dl>
+                  <dl className={styles.facts}><div><dt>Client</dt><dd>{p.clientName}</dd></div><div><dt>Project manager</dt><dd>{p.pmName}</dd></div><div><dt>Forecast cohort</dt><dd>{p.projectType?.replaceAll('_', ' ') ?? 'Unclassified'} · {p.region ?? 'Region missing'}</dd></div></dl>
                   {p.investorProjectId && <Link href="/investors" className={styles.link}><ExternalLink size={16} /> Linked to the off-plan sales portfolio</Link>}
 
                   {/* Progress */}
@@ -108,9 +111,31 @@ export function ProjectsWorkspace({ projects, kpis, canMutate }: {
 
       {showNew && <NewProjectDialog onClose={() => setShowNew(false)} onDone={(n) => { setShowNew(false); flash(`Project created · ${n}`); }} />}
       {editing && <EditProjectDialog project={editing} onClose={() => setEditing(null)} onDone={(name) => { setEditing(null); flash(`Project updated · ${name}`); }} />}
+      {classifying && <ClassifyProjectDialog project={classifying} onClose={() => setClassifying(null)} onDone={(name) => { setClassifying(null); flash(`Forecast cohort saved · ${name}`); }} />}
       {toast && <ConstructionToast>{toast}</ConstructionToast>}
     </ConstructionFrame>
   );
+}
+
+function ClassifyProjectDialog({ project, onClose, onDone }: { project: ProjectCard; onClose: () => void; onDone: (name: string) => void }) {
+  const router = useRouter();
+  const [projectType, setProjectType] = useState<ConstructionProjectType | ''>(project.projectType ?? '');
+  const [region, setRegion] = useState(project.region ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useConstructionSave(setError);
+  const submit = () => start(async () => {
+    if (!projectType) return;
+    const result = await classifyProjectForForecast(project.id, { projectType, region });
+    if (!result.ok) { setError(result.error); return; }
+    router.refresh(); onDone(project.name);
+  });
+  return <ConstructionDialog title={`Forecast cohort · ${project.name}`} onClose={onClose} pending={pending}><div className={styles.stack}>
+    <p className={styles.notice}>Classify this project so completed outcomes can be compared with similar projects. Corrections are audited, including after closeout.</p>
+    <label className={styles.field}>Project type<select aria-label="Project type" value={projectType} onChange={(event) => setProjectType(event.target.value as ConstructionProjectType | '')}><option value="">Choose a type</option>{CONSTRUCTION_PROJECT_TYPES.map((type) => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}</select></label>
+    <label className={styles.field}>State or region<input aria-label="State or region" maxLength={80} value={region} onChange={(event) => setRegion(event.target.value)} placeholder="Lagos, Nigeria" /></label>
+    {error && <p role="alert" className={styles.error}>{error}</p>}
+    <div className={styles.actions}><Button type="button" onClick={onClose} disabled={pending}>Cancel</Button><Button type="button" variant="primary" disabled={pending || !projectType || region.trim().length < 2} onClick={submit}>{pending ? 'Saving…' : 'Save cohort'}</Button></div>
+  </div></ConstructionDialog>;
 }
 
 function EditProjectDialog({ project, onClose, onDone }: { project: ProjectCard; onClose: () => void; onDone: (name: string) => void }) {
@@ -131,11 +156,11 @@ function EditProjectDialog({ project, onClose, onDone }: { project: ProjectCard;
 
 function NewProjectDialog({ onClose, onDone }: { onClose: () => void; onDone: (n: string) => void }) {
   const router = useRouter();
-  const [f, setF] = useState<ProjectInput>({ name: '', location: '', clientName: '', contractNaira: 0, budgetNaira: 0, plannedFinishISO: '' });
+  const [f, setF] = useState<Omit<ProjectInput, 'projectType'> & { projectType: ConstructionProjectType | '' }>({ name: '', location: '', clientName: '', contractNaira: 0, budgetNaira: 0, plannedFinishISO: '', projectType: '', region: '' });
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useConstructionSave(setError);
   const set = (k: keyof ProjectInput, v: string | number) => setF((s) => ({ ...s, [k]: v }));
-  function submit() { setError(null); start(async () => { const r = await createProject(f); if (!r.ok) { setError(r.error); return; } router.refresh(); onDone(r.ref ?? f.name); }); }
+  function submit() { if (!f.projectType) return; const input: ProjectInput = { ...f, projectType: f.projectType }; setError(null); start(async () => { const r = await createProject(input); if (!r.ok) { setError(r.error); return; } router.refresh(); onDone(r.ref ?? f.name); }); }
   return (
     <ConstructionDialog title={"New project"} onClose={onClose} pending={pending}>
       <div className={styles.stack}>
@@ -146,13 +171,17 @@ function NewProjectDialog({ onClose, onDone }: { onClose: () => void; onDone: (n
           <label className={styles.field}>Client<input aria-label="Client" value={f.clientName} onChange={(e) => set('clientName', e.target.value)} placeholder="Client or project owner" /></label>
         </div>
         <div className={styles.formGrid}>
+          <label className={styles.field}>Project type<select aria-label="Project type" value={f.projectType} onChange={(e) => set('projectType', e.target.value)}><option value="">Choose a type</option>{CONSTRUCTION_PROJECT_TYPES.map((type) => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}</select></label>
+          <label className={styles.field}>State or region<input aria-label="State or region" maxLength={80} value={f.region} onChange={(e) => set('region', e.target.value)} placeholder="Lagos, Nigeria" /></label>
+        </div>
+        <div className={styles.formGrid}>
           <label className={styles.field}>Contract (₦)<input aria-label="Contract (₦)" type="number" min="0" step="0.01" value={f.contractNaira || ''} onChange={(e) => set('contractNaira', Number(e.target.value) || 0)} inputMode="decimal" /></label>
           <label className={styles.field}>Budget (₦)<input aria-label="Budget (₦)" type="number" min="0" step="0.01" value={f.budgetNaira || ''} onChange={(e) => set('budgetNaira', Number(e.target.value) || 0)} inputMode="decimal" /></label>
         </div>
         <label className={styles.field}>Planned finish · WAT date<input aria-label="Planned finish" type="date" value={f.plannedFinishISO} onChange={(e) => set('plannedFinishISO', e.target.value)} /></label>
       {error && <div role="alert" className={styles.error}>{error}</div>}
       <p className={styles.notice}>Creates a planning record in NGN. Review the client, location, contract value, budget and finish date before confirming.</p>
-      <div className={styles.actions}><Button type="button" disabled={pending} onClick={onClose} >Cancel</Button><Button variant="primary" type="button" onClick={submit} disabled={pending || !f.name.trim() || !f.location.trim() || !f.clientName.trim() || !f.plannedFinishISO || f.contractNaira < 0 || f.budgetNaira < 0} >{pending ? 'Creating…' : 'Create project'}</Button></div></div>
+      <div className={styles.actions}><Button type="button" disabled={pending} onClick={onClose} >Cancel</Button><Button variant="primary" type="button" onClick={submit} disabled={pending || !f.name.trim() || !f.location.trim() || !f.clientName.trim() || !f.projectType || !f.region.trim() || !f.plannedFinishISO || f.contractNaira < 0 || f.budgetNaira < 0} >{pending ? 'Creating…' : 'Create project'}</Button></div></div>
     </ConstructionDialog>
   );
 }

@@ -56,6 +56,9 @@ export type Project = TenantScoped & {
   projectId: string;
   investorProjectId?: string; // ties to the existing off-plan investorProjects (p-marina, p-cedar)
   code: string; name: string; location: string; clientName: string; pmName: string;
+  /** Explicit, audited cohort labels for completed-project forecast evaluation. */
+  projectType?: import('./forecast-evaluation').ConstructionProjectType;
+  region?: string;
   status: ProjectStatus;
   contractValue: Money; approvedBudget: Money;
   startISO: string; plannedFinishISO: string; actualStartISO?: string;

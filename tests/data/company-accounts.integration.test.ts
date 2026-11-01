@@ -337,7 +337,7 @@ describe.skipIf(!testUrl)('native company accounts with real restricted PostgreS
     expect(await addEstateProperty(input)).toEqual(property);
     const order = await createEstateWorkOrder({ siteId: property.id, title: 'Inspect native company property', priority: 'routine', idempotencyKey: randomUUID() });
     expect(order.ok).toBe(true);
-    expect(await createProject({ name: 'Native company construction', location: 'Lagos', clientName: 'Disposable client', contractNaira: 1000.01, budgetNaira: 900, plannedFinishISO: '2030-01-01' })).toMatchObject({ ok: true });
+    expect(await createProject({ name: 'Native company construction', location: 'Lagos', clientName: 'Disposable client', contractNaira: 1000.01, budgetNaira: 900, plannedFinishISO: '2030-01-01', projectType: 'residential', region: 'Lagos, Nigeria' })).toMatchObject({ ok: true });
     const runtime = globalThis as typeof globalThis & { __propbrewPgPool?: { pool: Pool } };
     await runtime.__propbrewPgPool?.pool.end(); delete runtime.__propbrewPgPool;
     request.headers = new Headers({ cookie: cookieHeader(ownerA) });

@@ -26,6 +26,7 @@ async function createProject(page: Page, name: string) {
   await openDialog(page.getByRole('button', { name: 'New project', exact: true }), dialog);
   await dialog.getByLabel('Name', { exact: true }).fill(name);
   await dialog.getByLabel('Location', { exact: true }).fill('Lekki, Lagos');
+  await dialog.getByLabel('State or region', { exact: true }).fill('Lagos, Nigeria');
   await dialog.getByLabel('Client', { exact: true }).fill('Acceptance client');
   await dialog.getByLabel('Contract (₦)', { exact: true }).fill('25000000');
   await dialog.getByLabel('Budget (₦)', { exact: true }).fill('20000000');

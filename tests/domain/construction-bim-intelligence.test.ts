@@ -149,7 +149,7 @@ describe('native construction BIM exchange and forecast evidence', () => {
     const snapshots: ForecastSnapshot[] = Array.from({ length: 20 }, (_, index) => ({ id: String(index), tenantId: 'tenant-a', projectId: `p-${index}`, projectName: `Project ${index}`,
       recordedAtISO: '2026-01-01T10:00:00Z', predictedFinishISO: '2026-02-01', predictedCostMinor: 10000,
       baselineFinishISO: '2026-02-01', cpi: 1, spi: 1, recordedBy: 'pm' }));
-    const outcomes = snapshots.map((row, index) => ({ projectId: row.projectId, completedAtISO: `2026-02-${String(index + 2).padStart(2, '0')}T12:00:00Z`, actualCostMinor: 10000 + index * 1000 }));
+    const outcomes = snapshots.map((row, index) => ({ tenantId: row.tenantId, projectId: row.projectId, completedAtISO: `2026-02-${String(index + 2).padStart(2, '0')}T12:00:00Z`, actualCostMinor: 10000 + index * 1000, projectType: 'residential' as const, region: 'Lagos, Nigeria' }));
     expect(evaluateConstructionForecasts(snapshots.slice(0, 19), outcomes).validationReady).toBe(false);
     const evaluated = evaluateConstructionForecasts(snapshots, outcomes);
     expect(evaluated.validationReady).toBe(true);
@@ -158,5 +158,33 @@ describe('native construction BIM exchange and forecast evidence', () => {
     expect(evaluated.holdoutFinishCoveragePct).toBe(0);
     expect(evaluated.calibrated).toBe(false);
     expect(evaluated.count).toBe(20);
+  });
+
+  it('withholds cohort validation below 20 and raises a review signal when recent errors worsen', () => {
+    const snapshots: ForecastSnapshot[] = Array.from({ length: 20 }, (_, index) => ({
+      id: `forecast-${index}`, tenantId: 'tenant-a', projectId: `project-${index}`, projectName: `Project ${index}`,
+      recordedAtISO: '2026-01-01T10:00:00Z', predictedFinishISO: new Date(Date.UTC(2026, 5, 1 + index - (index < 10 ? 1 : 10))).toISOString().slice(0, 10),
+      predictedCostMinor: index < 10 ? 10000 : 7000, baselineFinishISO: '2026-06-01', cpi: 1, spi: 1, recordedBy: 'pm',
+    }));
+    const outcomes = snapshots.map((row, index) => ({
+      tenantId: row.tenantId, projectId: row.projectId,
+      completedAtISO: new Date(Date.UTC(2026, 5, 1 + index)).toISOString(),
+      actualCostMinor: 10000, projectType: 'residential' as const,
+      region: index < 19 ? 'Lagos, Nigeria' : 'Abuja, Nigeria',
+    }));
+    const result = evaluateConstructionForecasts(snapshots, outcomes);
+    expect(result.count).toBe(20);
+    expect(result.drift).toBe('review_trigger');
+    expect(result.cohorts.find((row) => row.dimension === 'project_type' && row.label === 'residential')).toMatchObject({ count: 20, validationReady: true, drift: 'review_trigger' });
+    expect(result.cohorts.find((row) => row.dimension === 'region' && row.label === 'Lagos, Nigeria')).toMatchObject({ count: 19, validationReady: false, drift: 'insufficient_history' });
+  });
+
+  it('never matches a completed project to another company’s forecast with the same project ID', () => {
+    const snapshot: ForecastSnapshot = { id: 'other-company', tenantId: 'tenant-b', projectId: 'shared-id',
+      projectName: 'Other project', recordedAtISO: '2026-01-01T10:00:00Z', predictedFinishISO: '2026-02-01',
+      predictedCostMinor: 10000, baselineFinishISO: '2026-02-01', cpi: 1, spi: 1, recordedBy: 'pm' };
+    const outcome = { tenantId: 'tenant-a', projectId: 'shared-id', completedAtISO: '2026-03-01T12:00:00Z',
+      actualCostMinor: 15000, projectType: 'residential' as const, region: 'Lagos, Nigeria' };
+    expect(evaluateConstructionForecasts([snapshot], [outcome]).count).toBe(0);
   });
 });

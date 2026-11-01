@@ -22,7 +22,7 @@ export default async function ConstructionProjectsPage() {
     const openCritical = world.issues.filter((i) => i.projectId === p.id && i.status !== 'resolved' && (i.severity === 'critical' || i.severity === 'high')).length;
     const health = projectHealth(evm.spi, evm.cpi, openCritical);
     return {
-      id: p.id, name: p.name, code: p.code, location: p.location, clientName: p.clientName, pmName: p.pmName, status: p.status,
+      id: p.id, name: p.name, code: p.code, location: p.location, clientName: p.clientName, pmName: p.pmName, status: p.status, projectType: p.projectType, region: p.region,
       contractMinor: p.contractValue.minor, budgetMinor: p.approvedBudget.minor,
       committedMinor: projectCommittedMinor(p.id, world.costCodes), actualMinor: projectActualMinor(p.id, world.costCodes),
       percentComplete: p.percentComplete, plannedPercent: p.plannedPercent, cpi: evm.cpi, spi: evm.spi,
