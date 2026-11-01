@@ -20,6 +20,7 @@ export type CopilotEvent =
   | { v: 1; type: 'activity'; activity: CopilotActivity }
   | { v: 1; type: 'meta'; source: 'llm'; model: string; scopeLabel: string; snapshotISO: string; coverage: CopilotCoverage[]; sources: CopilotSource[]; notices: string[] }
   | { v: 1; type: 'delta'; text: string }
+  | { v: 1; type: 'grounding'; status: 'supported' | 'needs_review' | 'unavailable'; supported: number; checked: number; message: string }
   | { v: 1; type: 'complete'; interactionId: string; usage: CopilotUsage }
   | { v: 1; type: 'error'; code: string; message: string; retryable: boolean; retryAfterS?: number };
 

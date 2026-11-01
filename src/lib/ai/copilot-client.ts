@@ -8,6 +8,7 @@ export type CopilotExchange = {
   activities: CopilotActivity[]; startedAt: number; completedAt?: number;
   requestId?: string; meta?: CopilotMeta; interactionId?: string;
   usage?: Extract<CopilotEvent, { type: 'complete' }>['usage']; error?: CopilotFailure; retryOf?: string;
+  grounding?: Extract<CopilotEvent, { type: 'grounding' }>;
 };
 
 export class CopilotClientError extends Error {
@@ -38,6 +39,7 @@ export function parseCopilotEvent(value: unknown, module: CopilotModule): Copilo
     return { v: 1, type: 'meta', source: 'llm', model: value.model, scopeLabel: value.scopeLabel, snapshotISO: value.snapshotISO, coverage, sources, notices: value.notices as string[] };
   }
   if (value.type === 'delta' && text(value.text, 1000000)) return { v: 1, type: 'delta', text: value.text };
+  if (value.type === 'grounding' && ['supported', 'needs_review', 'unavailable'].includes(String(value.status)) && number(value.supported) && number(value.checked) && value.supported <= value.checked && text(value.message, 1000)) return { v: 1, type: 'grounding', status: value.status as 'supported' | 'needs_review' | 'unavailable', supported: value.supported, checked: value.checked, message: value.message };
   if (value.type === 'complete' && text(value.interactionId, 200) && value.interactionId && object(value.usage) && number(value.usage.inputTokens) && number(value.usage.outputTokens) && number(value.usage.estimatedCostMinorNgn) && typeof value.usage.recorded === 'boolean') return { v: 1, type: 'complete', interactionId: value.interactionId, usage: { inputTokens: value.usage.inputTokens, outputTokens: value.usage.outputTokens, estimatedCostMinorNgn: value.usage.estimatedCostMinorNgn, recorded: value.usage.recorded } };
   if (value.type === 'error' && text(value.code, 200) && text(value.message, 4000) && value.message && typeof value.retryable === 'boolean' && (value.retryAfterS === undefined || number(value.retryAfterS))) return { v: 1, type: 'error', code: value.code, message: value.message, retryable: value.retryable, ...(value.retryAfterS === undefined ? {} : { retryAfterS: value.retryAfterS }) };
   throw invalid();
@@ -52,6 +54,7 @@ export function applyCopilotEvent(exchange: CopilotExchange, event: CopilotEvent
   }
   if (event.type === 'meta') return { ...exchange, meta: event };
   if (event.type === 'delta') return { ...exchange, text: exchange.text + event.text, status: 'streaming' };
+  if (event.type === 'grounding') return { ...exchange, grounding: event };
   if (event.type === 'complete') return { ...exchange, status: 'complete', completedAt: now, interactionId: event.interactionId, usage: event.usage };
   return { ...exchange, status: 'error', completedAt: now, error: { code: event.code, message: event.message, retryable: event.retryable, ...(event.retryAfterS === undefined ? {} : { retryAfterS: event.retryAfterS }) } };
 }

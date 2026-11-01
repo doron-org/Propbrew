@@ -65,6 +65,15 @@ describe('Verified public Copilot stream reader', () => {
     expect(received.at(-1)?.type).toBe('complete');
   });
 
+  it('keeps the page-grounding verdict visible without accepting private judge details', async () => {
+    const value = { v: 1, type: 'grounding', status: 'needs_review', supported: 1, checked: 2,
+      message: 'One PDF claim needs source review.', privateReasoning: 'never send this' };
+    const event = parseCopilotEvent(value, 'construction');
+    expect(event).toEqual({ v: 1, type: 'grounding', status: 'needs_review', supported: 1, checked: 2, message: value.message });
+    expect(applyCopilotEvent(exchange(), event).grounding).toEqual(event);
+    expect(() => parseCopilotEvent({ ...value, supported: 3 }, 'construction')).toThrow(CopilotClientError);
+  });
+
   it.each(['estate', 'facility', 'shortlet', 'construction'] as const)('permits only %s source paths in server metadata', (module) => {
     expect(parseCopilotEvent(meta(module), module)).toEqual(meta(module));
     for (const href of ['javascript:alert(1)', 'https://evil.invalid', '//evil.invalid', '/admin', '/shortlet/../../admin', '/construction/\\evil', '/assets secret', '/shortlet/%2fadmin']) expect(() => parseCopilotEvent({ ...meta(module), sources: [{ id: 'bad', label: 'Bad link', href }] }, module)).toThrow(CopilotClientError);

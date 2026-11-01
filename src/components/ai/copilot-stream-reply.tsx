@@ -29,6 +29,7 @@ export function CopilotStreamReply({ exchange, name, busy, onRetry }: { exchange
     {exchange.status === 'stopped' && <StatusPill status="Stopped · incomplete" tone="warn" />}
     {exchange.status === 'error' && <StatusPill status="Request unsuccessful" tone="danger" />}
     {exchange.meta?.coverage.some((entry) => !entry.complete) && <StatusPill status="Partial record coverage" tone="warn" />}
+    {exchange.grounding && <StatusPill status={exchange.grounding.status === 'supported' ? 'PDF citations checked' : exchange.grounding.status === 'needs_review' ? 'PDF claims need review' : 'PDF check unavailable'} tone={exchange.grounding.status === 'supported' ? 'success' : 'warn'} />}
   </>} sources={exchange.meta && <>
     <details className={styles.activity}>
       <summary aria-label="Record context & coverage"><span className={styles.activityMark}><FileSearch size={16} aria-hidden="true" /></span><span>Record context &amp; coverage</span><ChevronDown size={15} className={styles.activityChevron} aria-hidden="true" /></summary>
@@ -45,6 +46,7 @@ export function CopilotStreamReply({ exchange, name, busy, onRetry }: { exchange
   </>}>
     <CopilotActivityPanel activities={exchange.activities} status={exchange.status} startedAt={exchange.startedAt} completedAt={exchange.completedAt} />
     {exchange.text ? <CopilotAnswer text={exchange.text} /> : !incomplete && <p role="status">Waiting for the AI response…</p>}
+    {exchange.grounding && <p className={styles.metadata} role="status">{exchange.grounding.message}</p>}
     {incomplete && exchange.text && <p className={styles.metadata}>This partial answer is incomplete. Review the source records before using it.</p>}
     {exchange.status === 'stopped' && <p>Request stopped. You can retry explicitly; no source records were changed.</p>}
     {exchange.error && <p>{exchange.error.message}</p>}

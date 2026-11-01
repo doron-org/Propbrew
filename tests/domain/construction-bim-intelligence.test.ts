@@ -7,13 +7,14 @@ import { createBcfZip, parseBcfZip } from '@/domain/construction/bcf';
 import { detectModelFormat, compareModels } from '@/domain/construction/model-clashes';
 import { evaluateConstructionForecasts, type ForecastSnapshot } from '@/domain/construction/forecast-evaluation';
 import { parseIfcMesh, parseIfcModel } from '@/server/construction/ifc-model';
-import { extractConstructionPdfText } from '@/server/construction/document-text';
+import { extractConstructionPdfText, extractConstructionPdfForIndex } from '@/server/construction/document-text';
 import { retrieveConstructionDocumentText } from '@/server/construction/document-text';
 import { runWithRecordContext } from '@/server/data/record-context';
 import { createDemoWorkspaceState } from '@/server/data/demo-state';
 import { actorForCompanyMember } from '@/lib/auth/company-policy';
 import type { ConstructionDoc } from '@/domain/construction/types';
 import { validCopilotSource } from '@/lib/ai/copilot-protocol';
+import { validateDocumentFindings } from '@/server/construction/document-answer-evaluation';
 
 describe('native construction BIM exchange and forecast evidence', () => {
   it('parses a real IFC file into metre-space elements retaining IFC GlobalIds', async () => {
@@ -80,7 +81,27 @@ describe('native construction BIM exchange and forecast evidence', () => {
     const pdf = await PDFDocument.create(); const font = await pdf.embedFont(StandardFonts.Helvetica);
     pdf.addPage().drawText('Approved drainage detail for level four', { x: 40, y: 700, font, size: 12 });
     const pages = await extractConstructionPdfText(await pdf.save());
-    expect(pages).toEqual([{ page: 1, text: 'Approved drainage detail for level four' }]);
+    expect(pages).toEqual([{ page: 1, text: 'Approved drainage detail for level four', method: 'text' }]);
+  });
+
+  it('renders scanned pages for OCR in bounded passes and preserves page citations', async () => {
+    const pdf = await PDFDocument.create();
+    const { createCanvas } = await import('@napi-rs/canvas');
+    const canvas = createCanvas(500, 180); const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 500, 180);
+    ctx.fillStyle = '#000'; ctx.font = '30px sans-serif'; ctx.fillText('SPEC 07-12 WATERPROOFING', 15, 90);
+    const png = await pdf.embedPng(await canvas.encode('png'));
+    for (let index = 0; index < 3; index++) pdf.addPage([500, 180]).drawImage(png, { x: 0, y: 0, width: 500, height: 180 });
+    const bytes = await pdf.save(); const seen: number[] = [];
+    const first = await extractConstructionPdfForIndex(bytes, { maxOcrPages: 2, ocrPage: async (image, page) => {
+      expect(image.subarray(0, 8)).toEqual(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]));
+      seen.push(page); return 'SPEC 07-12 WATERPROOFING - revised membrane detail';
+    } });
+    expect(seen).toEqual([1, 2]); expect(first.pendingPages).toEqual([3]);
+    expect(first.pages.map((row) => [row.page, row.method])).toEqual([[1, 'ocr'], [2, 'ocr']]);
+    const second = await extractConstructionPdfForIndex(bytes, { existing: { tenantId: 't', projectId: 'p', docId: 'd', fileId: 'f', sha256: 's', pages: first.pages, pendingPages: first.pendingPages, extractedAtISO: '' },
+      maxOcrPages: 2, ocrPage: async () => 'SPEC 07-12 WATERPROOFING - revised membrane detail' });
+    expect(second.pendingPages).toEqual([]); expect(second.pages.map((row) => row.page)).toEqual([1, 2, 3]);
   });
 
   it('retrieves PDF pages only when tenant, project, document and file hash match an authorised revision', () => {
@@ -100,6 +121,15 @@ describe('native construction BIM exchange and forecast evidence', () => {
     expect(search([{ ...doc('doc-1', 'cp-cedar'), fileSha256: 'b'.repeat(64) }])).toHaveLength(0);
     expect(validCopilotSource('construction', { id: 'page', label: 'PDF page 2', href: '/api/construction/drawings/11111111-1111-4111-8111-111111111111?view=1#page=2' })).toBe(true);
     expect(validCopilotSource('estate', { id: 'page', label: 'PDF page 2', href: '/api/construction/drawings/11111111-1111-4111-8111-111111111111?view=1#page=2' })).toBe(false);
+  });
+
+  it('downgrades a claimed supported answer when its exact approved page was not cited', () => {
+    const label = 'LAG-SPEC-104 · Waterproofing rev B · PDF page 3';
+    const pages = [{ sourceId: 'construction-document-file-3', label }];
+    const finding = [{ claim: 'Membrane thickness is 2 mm', sourceId: pages[0].sourceId, verdict: 'supported' as const }];
+    expect(validateDocumentFindings(`The membrane is 2 mm thick (${label}).`, finding, pages)[0].verdict).toBe('supported');
+    expect(validateDocumentFindings('The membrane is 2 mm thick.', finding, pages)[0].verdict).toBe('uncited');
+    expect(validateDocumentFindings('The membrane is 2 mm thick.', finding, [])[0].verdict).toBe('uncited');
   });
 
   it('uses later completed projects to check the empirical error band', () => {

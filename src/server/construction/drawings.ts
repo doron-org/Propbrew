@@ -14,7 +14,8 @@ import { operatingDateISO, operatingNowISO } from '@/server/operating-clock';
 import { nextRevision } from '@/domain/construction';
 import type { ConstructionDoc, Project } from '@/domain/construction/types';
 import { drawingFileName, drawingUploadSchema, validDrawingFileId, validDrawingPdf, type DrawingUploadInput } from '@/domain/construction/drawings';
-import { extractConstructionPdfText, indexConstructionDrawingText, indexedConstructionDrawingFileIds } from './document-text';
+import { extractConstructionPdfForIndex, indexConstructionDrawingText, constructionDocumentIndexEntry } from './document-text';
+import { constructionOcr } from './document-ocr';
 
 export class ConstructionDrawingError extends Error {
   constructor(message: string, readonly status = 400) { super(message); }
@@ -96,8 +97,8 @@ export async function storeConstructionDrawing(input: Upload): Promise<{ id: str
   if (input.declaredType && input.declaredType !== 'application/pdf' || !validDrawingPdf(input.bytes)) throw new ConstructionDrawingError('Choose a valid PDF drawing of at most 15 MB.');
   const fileName = drawingFileName(input.name);
   const sha256 = createHash('sha256').update(input.bytes).digest('hex');
-  // Index only extractable text. Invalid or scanned pages do not block the controlled file upload.
-  const pages = await extractConstructionPdfText(input.bytes).catch(() => null);
+  // Store the file even if extraction fails; OCR is a bounded, separately metered index action.
+  const extracted = await extractConstructionPdfForIndex(input.bytes).catch(() => null);
   const requestHash = createHash('sha256').update(JSON.stringify([data, fileName, sha256])).digest('hex');
   const saved = await inWorkspace(identity, async (client) => {
     const project = scopedConstructionProjectGet(identity.actor, data.projectId, 'create');
@@ -134,8 +135,8 @@ export async function storeConstructionDrawing(input: Upload): Promise<{ id: str
     await client.query('insert into construction_drawing_files(id,tenant_id,project_id,doc_id,package_scope_ids,request_key,request_hash,name,content_type,size_bytes,sha256,bytes,created_by) values($1::uuid,$2::uuid,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13::uuid)', [fileId, identity.company.id, project.id, doc.id, JSON.stringify(packageScopeIds(project, data.workPackageIds)), input.key, requestHash, fileName, 'application/pdf', input.bytes.byteLength, sha256, Buffer.from(input.bytes), identity.user.id]);
     doc.fileId = fileId; doc.fileName = fileName; doc.fileSizeBytes = input.bytes.byteLength; doc.fileSizeKb = Math.ceil(input.bytes.byteLength / 1024); doc.fileSha256 = sha256; doc.requiresFile = true;
     doc.locationIds = [...data.locationIds]; doc.workPackageIds = [...data.workPackageIds];
-    if (pages !== null) indexConstructionDrawingText({ tenantId: identity.company.id, projectId: project.id, docId: doc.id, fileId, sha256,
-      pages, extractedAtISO: operatingNowISO() });
+    if (extracted !== null) indexConstructionDrawingText({ tenantId: identity.company.id, projectId: project.id, docId: doc.id, fileId, sha256,
+      pages: extracted.pages, pendingPages: extracted.pendingPages, pageCount: extracted.pageCount, extractedAtISO: operatingNowISO() });
     await addAudit(identity, client, doc, 'construction.drawing.uploaded', { projectId: project.id, number: doc.number, revision: doc.revision, sha256, size: input.bytes.byteLength, locationIds: doc.locationIds, workPackageIds: doc.workPackageIds });
     return { value: { id: fileId, docId: doc.id, number: doc.number, revision: doc.revision, url: `/api/construction/drawings/${fileId}` } };
   }).catch((error: unknown) => {
@@ -161,28 +162,43 @@ export async function readConstructionDrawing(id: string): Promise<{ name: strin
 }
 
 /** Bounded backfill for PDFs uploaded before text indexing was introduced. */
-export async function reindexConstructionDrawings(projectId: string): Promise<{ indexed: number; remaining: number }> {
+export async function reindexConstructionDrawings(projectId: string): Promise<{ indexed: number; remaining: number; pendingPages: number; ocrErrors: number; ocrAvailable: boolean }> {
   const identity = await principal(true);
   if (!projectId || projectId.length > 200) throw new ConstructionDrawingError('Choose a project.');
-  return inWorkspace(identity, async (client) => {
+  const ocrPage = await constructionOcr(identity.company.id, identity.user.id);
+  const batch = await inWorkspace(identity, async (client) => {
     const project = scopedConstructionProjectGet(identity.actor, projectId, 'create');
     if (!project) throw new ConstructionDrawingError('Project unavailable.', 404);
-    const done = indexedConstructionDrawingFileIds();
-    const pending = db.constructionDocs.filter((doc) => doc.tenantId === identity.company.id && doc.projectId === projectId && doc.fileId && doc.fileSha256 && !done.has(doc.fileId) && allowedDoc(identity.actor, doc, 'read'));
-    let indexed = 0;
-    for (const doc of pending.slice(0, 5)) {
+    const pending = db.constructionDocs.filter((doc) => doc.tenantId === identity.company.id && doc.projectId === projectId && doc.fileId && doc.fileSha256 && allowedDoc(identity.actor, doc, 'read') &&
+      (!constructionDocumentIndexEntry(doc.fileId) || constructionDocumentIndexEntry(doc.fileId)?.pageCount === undefined || (constructionDocumentIndexEntry(doc.fileId)?.pendingPages?.length ?? 0) > 0));
+    const files: Array<{ docId: string; fileId: string; sha256: string; bytes: Uint8Array; existing: ReturnType<typeof constructionDocumentIndexEntry> }> = [];
+    for (const doc of pending.slice(0, ocrPage ? 2 : 5)) {
       const result = await client.query<{ bytes: Buffer; sha256: string }>('select bytes,sha256 from construction_drawing_files where id=$1::uuid and tenant_id=$2::uuid and project_id=$3 and doc_id=$4', [doc.fileId, identity.company.id, projectId, doc.id]);
       const file = result.rows[0];
       if (!file || file.sha256 !== doc.fileSha256 || createHash('sha256').update(file.bytes).digest('hex') !== file.sha256) throw new ConstructionDrawingError('A stored PDF failed its integrity check.', 503);
-      let pages: Awaited<ReturnType<typeof extractConstructionPdfText>>;
-      try { pages = await extractConstructionPdfText(new Uint8Array(file.bytes)); }
-      catch { throw new ConstructionDrawingError('PDF text extraction failed. The controlled drawing is safe; retry indexing or upload a text-layer PDF.', 422); }
-      indexConstructionDrawingText({ tenantId: identity.company.id, projectId, docId: doc.id, fileId: doc.fileId!, sha256: file.sha256,
-        pages, extractedAtISO: operatingNowISO() });
-      indexed++;
+      files.push({ docId: doc.id, fileId: doc.fileId!, sha256: file.sha256, bytes: new Uint8Array(file.bytes), existing: constructionDocumentIndexEntry(doc.fileId!) });
     }
-    if (indexed) await client.query('insert into audit_events(tenant_id,actor_subject,action,entity,entity_id,payload) values($1::uuid,$2,$3,$4,$5,$6::jsonb)',
-      [identity.company.id, identity.user.id, 'construction.drawing.text_indexed', 'construction_project', projectId, JSON.stringify({ indexed, remaining: pending.length - indexed })]);
-    return { value: { indexed, remaining: pending.length - indexed }, commit: indexed > 0 };
+    return { value: { files, pendingCount: pending.length }, commit: false };
   });
+  let indexed = 0, pendingPages = 0, ocrErrors = 0;
+  for (const file of batch.files) {
+    let extracted: Awaited<ReturnType<typeof extractConstructionPdfForIndex>>;
+    try { extracted = await extractConstructionPdfForIndex(file.bytes, { existing: file.existing, ocrPage, maxOcrPages: ocrPage ? 2 : 0 }); }
+    catch { throw new ConstructionDrawingError('PDF text extraction failed. The controlled PDF is safe; retry indexing.', 422); }
+    await inWorkspace(identity, async (client) => {
+      const doc = db.constructionDocs.find((row) => row.id === file.docId && row.fileId === file.fileId && row.fileSha256 === file.sha256 && row.projectId === projectId);
+      if (!doc || !allowedDoc(identity.actor, doc, 'read')) throw new ConstructionDrawingError('Document access changed during indexing.', 409);
+      const current = constructionDocumentIndexEntry(file.fileId);
+      const pages = [...new Map([...(current?.pages ?? []), ...extracted.pages].map((row) => [row.page, row])).values()].sort((a, b) => a.page - b.page);
+      const pending = extracted.pendingPages.filter((page) => !pages.some((row) => row.page === page));
+      indexConstructionDrawingText({ tenantId: identity.company.id, projectId, docId: doc.id, fileId: file.fileId, sha256: file.sha256,
+        pages, pendingPages: pending, pageCount: extracted.pageCount, extractedAtISO: operatingNowISO() });
+      await client.query('insert into audit_events(tenant_id,actor_subject,action,entity,entity_id,payload) values($1::uuid,$2,$3,$4,$5,$6::jsonb)',
+        [identity.company.id, identity.user.id, 'construction.document.text_indexed', 'construction_document', doc.id,
+          JSON.stringify({ projectId, fileId: file.fileId, indexedPages: pages.length, pendingPages: pending.length, ocrAvailable: Boolean(ocrPage) })]);
+      return { value: null };
+    });
+    indexed++; pendingPages += extracted.pendingPages.length; ocrErrors += extracted.ocrErrors;
+  }
+  return { indexed, remaining: Math.max(0, batch.pendingCount - indexed), pendingPages, ocrErrors, ocrAvailable: Boolean(ocrPage) };
 }

@@ -2,9 +2,10 @@ import 'server-only';
 import { currentRecordContext } from '@/server/data/record-context';
 import type { Actor } from '@/lib/authz';
 import type { ConstructionDoc } from '@/domain/construction/types';
+import type { PDFPageProxy } from 'pdfjs-dist';
 
-type PageText = { page: number; text: string };
-type Entry = { tenantId: string; projectId: string; docId: string; fileId: string; sha256: string; pages: PageText[]; extractedAtISO: string };
+export type PageText = { page: number; text: string; method?: 'text' | 'ocr' };
+export type Entry = { tenantId: string; projectId: string; docId: string; fileId: string; sha256: string; pages: PageText[]; extractedAtISO: string; pendingPages?: number[]; pageCount?: number };
 type Index = { entries: Entry[] };
 const MAX_PAGES = 80;
 const MAX_PAGE_TEXT = 3000;
@@ -20,21 +21,55 @@ function index(write = false): Index {
   return value;
 }
 
-/** Text-layer extraction only. Scanned pages are intentionally not given fabricated OCR text. */
-export async function extractConstructionPdfText(bytes: Uint8Array): Promise<PageText[]> {
+/** PDF text and bounded, explicit OCR of pages without a useful text layer. */
+export async function extractConstructionPdfForIndex(bytes: Uint8Array, options: {
+  ocrPage?: (png: Uint8Array, page: number) => Promise<string>;
+  maxOcrPages?: number;
+  existing?: Entry;
+} = {}): Promise<{ pages: PageText[]; pendingPages: number[]; pageCount: number; ocrErrors: number }> {
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const loading = getDocument({ data: new Uint8Array(bytes), useSystemFonts: false, disableFontFace: true });
   const pdf = await loading.promise;
   try {
-    const pages: PageText[] = []; let total = 0;
-    for (let page = 1; page <= Math.min(pdf.numPages, MAX_PAGES); page++) {
-      const content = await (await pdf.getPage(page)).getTextContent();
+    const pages: PageText[] = [...(options.existing?.pages ?? [])];
+    const pendingPages: number[] = [];
+    let total = pages.reduce((sum, row) => sum + row.text.length, 0);
+    let ocrCount = 0, ocrErrors = 0;
+    const pageCount = Math.min(pdf.numPages, MAX_PAGES);
+    for (let page = 1; page <= pageCount; page++) {
+      if (pages.some((row) => row.page === page)) continue;
+      const pdfPage = await pdf.getPage(page);
+      const content = await pdfPage.getTextContent();
       const text = content.items.map((item) => 'str' in item ? item.str : '').join(' ').replace(/\s+/g, ' ').trim().slice(0, MAX_PAGE_TEXT);
-      if (text) { pages.push({ page, text }); total += text.length; }
-      if (total >= MAX_INDEX_TEXT) break;
+      // A few selectable labels on a scanned plan are not the document text.
+      if (text.length >= 24) { if (total + text.length <= MAX_INDEX_TEXT) { pages.push({ page, text, method: 'text' }); total += text.length; } continue; }
+      if (!options.ocrPage || ocrCount >= Math.min(options.maxOcrPages ?? 0, 5) || total >= MAX_INDEX_TEXT) { pendingPages.push(page); continue; }
+      ocrCount++;
+      try {
+        const png = await renderPdfPageForOcr(pdfPage);
+        const recognized = (await options.ocrPage(png, page)).replace(/\s+/g, ' ').trim().slice(0, Math.min(MAX_PAGE_TEXT, MAX_INDEX_TEXT - total));
+        if (recognized.length >= 12) { pages.push({ page, text: recognized, method: 'ocr' }); total += recognized.length; }
+        else pendingPages.push(page);
+      } catch { ocrErrors++; pendingPages.push(page); }
     }
-    return pages;
+    return { pages: pages.sort((a, b) => a.page - b.page), pendingPages, pageCount, ocrErrors };
   } finally { await loading.destroy(); }
+}
+
+export async function extractConstructionPdfText(bytes: Uint8Array): Promise<PageText[]> {
+  return (await extractConstructionPdfForIndex(bytes)).pages;
+}
+
+async function renderPdfPageForOcr(page: PDFPageProxy): Promise<Uint8Array> {
+  const { createCanvas } = await import('@napi-rs/canvas');
+  const original = page.getViewport({ scale: 1 });
+  const scale = Math.min(2, 1800 / Math.max(original.width, original.height));
+  const viewport = page.getViewport({ scale });
+  const canvas = createCanvas(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: context as never, canvas: canvas as never, viewport }).promise;
+  return new Uint8Array(await canvas.encode('png'));
 }
 
 export function indexConstructionDrawingText(entry: Entry) {
@@ -45,6 +80,7 @@ export function indexConstructionDrawingText(entry: Entry) {
   if (at >= 0) rows[at] = entry; else rows.push(entry);
 }
 export function indexedConstructionDrawingFileIds(): Set<string> { return new Set(index().entries.map((row) => row.fileId)); }
+export function constructionDocumentIndexEntry(fileId: string): Entry | undefined { return index().entries.find((row) => row.fileId === fileId); }
 
 const STOP = new Set(['what', 'when', 'where', 'which', 'with', 'from', 'this', 'that', 'have', 'does', 'about', 'project', 'drawing', 'document', 'show', 'tell']);
 export function retrieveConstructionDocumentText(actor: Actor, visibleDocs: readonly ConstructionDoc[], question: string) {
@@ -58,8 +94,9 @@ export function retrieveConstructionDocumentText(actor: Actor, visibleDocs: read
     .flatMap((entry) => entry.pages.map((page) => {
       const doc = docs.get(entry.fileId)!;
       const lower = page.text.toLowerCase();
-      const score = terms.reduce((sum, term) => sum + (lower.includes(term) ? 1 : 0), 0);
+      const metadata = `${doc.number} ${doc.title} ${doc.folder} ${doc.discipline}`.toLowerCase();
+      const score = terms.reduce((sum, term) => sum + (lower.includes(term) ? 2 : metadata.includes(term) ? 1 : 0), 0);
       return { docId: doc.id, projectId: entry.projectId, fileId: entry.fileId, number: doc.number, revision: doc.revision,
-        title: doc.title, page: page.page, text: page.text.slice(0, 1200), score };
+        title: doc.title, folder: doc.folder, method: page.method ?? 'text', page: page.page, text: page.text.slice(0, 1200), score };
     })).filter((row) => row.score > 0).sort((a, b) => b.score - a.score || a.number.localeCompare(b.number)).slice(0, 6);
 }
