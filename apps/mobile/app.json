@@ -1,14 +1,26 @@
 {
   "expo": {
-    "name": "Propbrew Estate",
-    "slug": "propbrew-resident",
+    "name": "Propbrew",
+    "slug": "propbrew",
     "scheme": "propbrew",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": { "supportsTablet": false, "bundleIdentifier": "com.propbrew.resident", "infoPlist": { "NSFaceIDUsageDescription": "Use Face ID to approve sensitive Propbrew actions." } },
-    "android": { "package": "com.propbrew.resident", "minSdkVersion": 26, "permissions": ["CAMERA", "RECORD_AUDIO", "USE_BIOMETRIC"] },
-    "plugins": ["expo-secure-store"],
-    "extra": { "apiUrl": "https://usepropbrew.com" }
+    "android": { "package": "com.propbrew.resident", "minSdkVersion": 26, "permissions": ["CAMERA", "ACCESS_FINE_LOCATION"] },
+    "plugins": [
+      "expo-secure-store",
+      ["expo-image-picker", {
+        "cameraPermission": "Allow Propbrew to capture construction site evidence.",
+        "photosPermission": "Allow Propbrew to attach selected site evidence photos.",
+        "microphonePermission": false
+      }],
+      ["expo-location", {
+        "locationWhenInUsePermission": "Allow Propbrew to check your location when you choose to check in at an assigned site.",
+        "isAndroidBackgroundLocationEnabled": false,
+        "isIosBackgroundLocationEnabled": false
+      }]
+    ],
+    "extra": { "apiUrl": "https://app.usepropbrew.com" }
   }
 }
