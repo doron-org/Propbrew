@@ -15,6 +15,7 @@ import { money } from '@/domain/primitives';
 import { createHash } from 'node:crypto';
 import { constructionControl } from '@/server/construction-control';
 import { assessFieldCheckIn } from '@/domain/construction/field-check-in';
+import { canCaptureConstructionTask } from '@/server/mobile/construction-task-access';
 
 import { outboxOwnerKey, type OpKind, type SyncOutcome } from '@/domain/sync';
 import { syncFingerprint, syncInputSchema } from '@/server/sync-validation';
@@ -51,11 +52,24 @@ export async function syncOperation(raw: SyncInput): Promise<SyncOutcome> {
   if (!project) return fail('That project is not available to this account.');
   if (input.kind === 'task_progress') {
     const task = scopedConstructionTaskGet(actor, input.payload.taskId, 'update');
-    if (!task || task.projectId !== p.projectId) return fail('Task and project assignment not found.');
+    if (!task || task.projectId !== p.projectId || !canCaptureConstructionTask(actor, task.id)) return fail('Task and project assignment not found.');
   }
-  if (actor.companyAccess?.operationalProfileId === 'construction-field-worker' && input.kind === 'evidence_pack') {
+  if (['construction-field-worker', 'subcontractor', 'site-engineer'].includes(actor.companyAccess?.operationalProfileId ?? '') && input.kind === 'evidence_pack') {
     const task = input.payload.subject === 'task' ? scopedConstructionTaskGet(actor, input.payload.subjectRef, 'read') : null;
-    if (!task || task.projectId !== p.projectId) return fail('Field workers may attach evidence only to their assigned tasks.');
+    if (!task || task.projectId !== p.projectId || !canCaptureConstructionTask(actor, task.id)) return fail('Scoped members may attach evidence only to their assigned tasks.');
+  }
+  // Native photos have an upload ledger. Browser Field Capture uses the older
+  // /api/upload path, whose evidence subjects include reports and deliveries.
+  if (input.kind === 'evidence_pack' && input.payload.mediaRefs.some((url) => url.includes('/api/construction/field-photos/'))) {
+    if (input.payload.mediaRefs.some((url) => !/^https:\/\/app\.usepropbrew\.com\/api\/construction\/field-photos\/[0-9a-f-]{36}$/i.test(url))) return fail('Use only uploaded Construction field photos for this capture.');
+    if (input.payload.subject !== 'task') return fail('Native evidence must be attached to a construction task.');
+    const task = scopedConstructionTaskGet(actor, input.payload.subjectRef, 'read');
+    if (!task || task.projectId !== p.projectId || !canCaptureConstructionTask(actor, task.id)) return fail('The evidence task is no longer available to this account.');
+    const uploads = constructionControl(actor.tenantId!).mobileUploads;
+    if (new Set(input.payload.mediaRefs).size !== input.payload.mediaRefs.length || input.payload.mediaRefs.some((url) => !uploads.some((upload) =>
+      upload.tenantId === actor.tenantId && upload.actorId === actor.userId && upload.projectId === p.projectId && upload.taskId === task.id && upload.url === url))) {
+      return fail('Upload each photo for this assigned task before syncing its evidence.');
+    }
   }
   if (input.kind === 'attendance') {
     const worker = scopedMutableGet(actor, 'reports_analytics', db.constructionWorkers, input.payload.workerId, 'read');

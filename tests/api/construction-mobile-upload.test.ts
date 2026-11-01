@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { identityByKey } from '@/server/identities';
 
-const boundary = vi.hoisted(() => ({ session: vi.fn(), state: { mobileUploads: [] as Record<string, unknown>[] }, project: vi.fn(), task: vi.fn(), put: vi.fn() }));
+const boundary = vi.hoisted(() => ({ session: vi.fn(), state: { mobileUploads: [] as Record<string, unknown>[] }, project: vi.fn(), task: vi.fn(), store: vi.fn() }));
 vi.mock('@/server/session', () => ({ getSession: boundary.session }));
 vi.mock('@/server/construction-control', () => ({ constructionControl: () => boundary.state }));
 vi.mock('@/server/data', () => ({ scopedConstructionProjectGet: boundary.project, scopedConstructionTaskGet: boundary.task }));
 vi.mock('@/server/data/durable-records', () => ({ withDurableMutation: (fn: () => Promise<unknown>) => fn() }));
-vi.mock('@vercel/blob', () => ({ put: boundary.put }));
+vi.mock('@/server/construction/field-photos', () => ({ storeFieldPhoto: boundary.store }));
 import { POST } from '@/app/api/mobile/v1/construction/upload/route';
 
 const actor = identityByKey('estate_manager').actor;
@@ -23,7 +23,7 @@ beforeEach(() => {
   boundary.session.mockResolvedValue({ actor });
   boundary.project.mockReturnValue({ id: 'project-1' });
   boundary.task.mockReturnValue({ id: 'task-1', projectId: 'project-1' });
-  boundary.put.mockResolvedValue({ url: 'https://blob.example/private-photo.jpg' });
+  boundary.store.mockResolvedValue({ ok: true, url: 'https://app.usepropbrew.com/api/construction/field-photos/00000000-0000-4000-8000-000000000000', duplicate: false });
 });
 
 describe('native Construction photo custody', () => {
@@ -33,15 +33,15 @@ describe('native Construction photo custody', () => {
     boundary.session.mockResolvedValue({ actor });
     boundary.task.mockReturnValue({ id: 'task-1', projectId: 'other-project' });
     expect((await POST(request())).status).toBe(422);
-    expect(boundary.put).not.toHaveBeenCalled();
+    expect(boundary.store).not.toHaveBeenCalled();
   });
   it('stores one private photo and returns the same receipt for an exact retry', async () => {
     expect((await POST(request())).status).toBe(200);
     expect((await POST(request())).status).toBe(200);
-    expect(boundary.put).toHaveBeenCalledTimes(1);
-    expect(boundary.put.mock.calls[0]?.[2]).toMatchObject({ access: 'private', contentType: 'image/jpeg' });
+    expect(boundary.store).toHaveBeenCalledTimes(1);
+    expect(boundary.store.mock.calls[0]?.[1]).toMatchObject({ contentType: 'image/jpeg', projectId: 'project-1', taskId: 'task-1' });
     expect(boundary.state.mobileUploads).toHaveLength(1);
     expect((await POST(request(new Uint8Array([0xff, 0xd8, 0xff, 0x00])))).status).toBe(422);
-    expect(boundary.put).toHaveBeenCalledTimes(1);
+    expect(boundary.store).toHaveBeenCalledTimes(1);
   });
 });

@@ -87,6 +87,21 @@ describe('offline ownership and exact retry receipts', () => {
 });
 
 describe('strict offline payloads and scoped relationships', () => {
+  it('accepts task evidence only after each photo has an owned upload receipt for that project', async () => {
+    const row = task();
+    const url = 'https://app.usepropbrew.com/api/construction/field-photos/00000000-0000-4000-8000-000000000000';
+    const payload = { subject: 'task', subjectRef: row.id, title: 'Slab inspection', mediaRefs: [url] };
+    const state = constructionControl(manager.tenantId!);
+    expect(await syncOperation(input('evidence_pack', payload, 'field-evidence-1'))).toMatchObject({ ok: false });
+    state.mobileUploads.push({ tenantId: manager.tenantId!, actorId: 'another-author', projectId: project().id, taskId: row.id, opId: 'another-capture', index: 0, url, contentType: 'image/jpeg', size: 4, sha256: 'a'.repeat(64) });
+    expect(await syncOperation(input('evidence_pack', payload, 'field-evidence-1'))).toMatchObject({ ok: false });
+    state.mobileUploads[0].actorId = manager.userId;
+    state.mobileUploads[0].projectId = db.constructionProjects.find((p) => p.tenantId === manager.tenantId && p.id !== project().id)!.id;
+    expect(await syncOperation(input('evidence_pack', payload, 'field-evidence-1'))).toMatchObject({ ok: false });
+    state.mobileUploads[0].projectId = project().id;
+    expect(await syncOperation(input('evidence_pack', payload, 'field-evidence-1'))).toMatchObject({ ok: true });
+    expect(state.evidencePacks[0]).toMatchObject({ subjectRef: row.id, capturedBy: manager.userId, mediaRefs: [url] });
+  });
   it.each([NaN, Infinity, -Infinity, -1, 101, '40'])('rejects invalid progress %s before writes or receipts', async (pct) => {
     const row = task(), before = structuredClone(row);
     expect(await syncOperation(input('task_progress', { taskId: row.id, percentComplete: pct }))).toMatchObject({ ok: false });

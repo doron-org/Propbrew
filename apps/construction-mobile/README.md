@@ -7,7 +7,7 @@ Native iOS and Android field app for assigned construction projects. This is a s
 ```bash
 cd apps/construction-mobile
 npm ci
-EXPO_PUBLIC_API_URL=https://usepropbrew.com npm run start
+EXPO_PUBLIC_API_URL=https://app.usepropbrew.com npm run start
 ```
 
 For a local API, set `EXPO_PUBLIC_API_URL` to a reachable host address, not `localhost` on a physical phone. Build with `npm run ios` or `npm run android` after the native toolchains are installed. Configure signing and store distribution before a public release.
@@ -25,8 +25,9 @@ For a local API, set `EXPO_PUBLIC_API_URL` to a reachable host address, not `loc
 - `GET /api/mobile/v1/construction/bootstrap` — assigned projects, tasks and own check-ins.
 - `POST /api/mobile/v1/construction/upload` — scoped task photo upload with an idempotent capture/photo index.
 - `POST /api/mobile/v1/construction/sync` — strict validated, owner-bound, idempotent progress, evidence and check-in writes.
+- `GET /api/construction/field-photos/:id` — authenticated, tenant-scoped photo retrieval.
 
-All three routes require the existing company session. They use the web app's construction permission and project/task scopes, durable workspace transaction, and sync ledger. Private Blob storage must be configured to accept evidence photos.
+The routes require the existing company session. They use the web app's construction permission and project/task scopes, durable workspace transaction, and sync ledger. Photo bytes are immutable PostgreSQL rows with row-level security, quota enforcement, backup coverage and a separate audit event. Migration `022_construction_field_photos.sql` must be applied before photo upload is enabled.
 
 ## Verification
 

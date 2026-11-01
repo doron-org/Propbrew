@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as FileSystem from 'expo-file-system/legacy';
 import type { Bootstrap, FieldOp, SyncOutcome } from './types';
 
-const origin = (process.env.EXPO_PUBLIC_API_URL ?? 'https://usepropbrew.com').replace(/\/$/, '');
+const origin = (process.env.EXPO_PUBLIC_API_URL ?? 'https://app.usepropbrew.com').replace(/\/$/, '');
 const COOKIE_KEY = 'propbrew.construction.session.cookie';
 const MFA_COOKIE_KEY = 'propbrew.construction.mfa.cookie';
 const OWNER_KEY = 'propbrew.construction.last.owner';

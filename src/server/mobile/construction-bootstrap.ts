@@ -3,12 +3,13 @@ import 'server-only';
 import type { Actor } from '@/lib/authz';
 import { repos } from '@/server/data';
 import { constructionControl } from '@/server/construction-control';
+import { canCaptureConstructionTask } from './construction-task-access';
 
 export function mobileConstructionBootstrap(actor: Actor, displayName: string) {
   const projects = repos.constructionProjects.list(actor, { limit: 500 }).items;
   const projectIds = new Set(projects.map((project) => project.id));
   const tasks = repos.constructionTasks.list(actor, { limit: 1000 }).items
-    .filter((task) => projectIds.has(task.projectId))
+    .filter((task) => projectIds.has(task.projectId) && canCaptureConstructionTask(actor, task.id))
     .map((task) => ({ id: task.id, projectId: task.projectId, name: task.name, status: task.status, percentComplete: task.percentComplete, plannedFinishISO: task.plannedFinishISO, priority: task.priority }));
   const checkIns = constructionControl(actor.tenantId!).fieldCheckIns
     .filter((row) => row.actorId === actor.userId && projectIds.has(row.projectId))
