@@ -10,6 +10,7 @@ import { withAuthTransaction } from '@/server/auth/database';
 import { isDemoAccount } from '@/server/auth/demo-config';
 import { withDurableRead } from '@/server/data/durable-records';
 import { repos } from '@/server/data';
+import { approvedConstructionSubcontractorAssignments } from '@/server/construction-control';
 
 type Result = { error?: string; message?: string; inviteUrl?: string };
 const uuid = z.uuid();
@@ -27,7 +28,7 @@ async function scopeFor(current: Awaited<ReturnType<typeof principal>>, profile:
     const records = await withDurableRead(async () => ({
       projects: repos.constructionProjects.list(current.actor, { limit: 500 }).items,
       packages: repos.constructionCostCodes.list(current.actor, { limit: 5000 }).items,
-      subcontractors: repos.constructionSubcontractors.list(current.actor, { limit: 1000 }).items,
+      subcontractors: [...repos.constructionSubcontractors.list(current.actor, { limit: 1000 }).items, ...approvedConstructionSubcontractorAssignments(current.company.id)],
       tasks: repos.constructionTasks.list(current.actor, { limit: 10000 }).items,
     }));
     const projects = new Set(records.projects.map((row) => String(row.id)));

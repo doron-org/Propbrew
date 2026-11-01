@@ -12,3 +12,11 @@ export function constructionControl(tenantId: string): ConstructionControlState 
   state.retentionReleases ??= [];
   return state;
 }
+
+/** Approved operational onboarding records must be assignable through Team & access.
+ * The seeded construction register remains a separate source for legacy projects. */
+export function approvedConstructionSubcontractorAssignments(tenantId: string) {
+  return constructionControl(tenantId).subcontractors
+    .filter((row) => row.tenantId === tenantId && row.status === 'approved')
+    .map((row) => ({ id: row.id, projectIds: row.projectIds, name: row.name, trade: row.trade }));
+}
