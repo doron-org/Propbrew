@@ -1,0 +1,23 @@
+.root { display: grid; gap: .9rem; border-top: 1px solid var(--border); padding-top: 1rem; min-width: 0; }
+.head, .viewHead { display: flex; justify-content: space-between; gap: .5rem; flex-wrap: wrap; align-items: baseline; }
+.head strong, .section h4, .viewHead strong { color: var(--text); font-weight: 650; }
+.head span, .viewHead span, .viewHead time, .meta, .empty { color: var(--text-3); font-size: .77rem; }
+.description { color: var(--text-2); font-size: .83rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.section { min-width: 0; display: grid; align-content: start; gap: .6rem; }
+.section h4 { font-size: .88rem; }
+.section h4 span { color: var(--text-3); font-weight: 450; }
+.viewpoint, .comment { display: grid; gap: .55rem; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-card); padding: .8rem; background: var(--surface-2); color: var(--text-2); font-size: .82rem; }
+.snapshot { display: block; max-width: 100%; width: 100%; max-height: 260px; object-fit: contain; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; margin: 0; }
+.facts dt { color: var(--text-3); font-size: .72rem; }
+.facts dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.ids, .comment p, .timeline span { overflow-wrap: anywhere; white-space: pre-wrap; }
+.comment small { color: var(--text-3); }
+.xml summary { min-height: 44px; display: flex; align-items: center; color: var(--brand-solid); cursor: pointer; font-weight: 600; }
+.xml summary:focus-visible { outline: 2px solid var(--brand-solid); outline-offset: 2px; }
+.xml pre { max-height: 260px; overflow: auto; padding: .7rem; border-radius: var(--radius-control); background: var(--surface); color: var(--text-2); font-size: .69rem; white-space: pre; }
+.timeline { display: grid; gap: .5rem; list-style: none; padding: 0; margin: 0; }
+.timeline li { display: grid; gap: .2rem; border-left: 2px solid var(--border-2); padding: .3rem .7rem; color: var(--text-2); font-size: .78rem; }
+.timeline time { color: var(--text-3); font-size: .72rem; }
+@media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr); } }

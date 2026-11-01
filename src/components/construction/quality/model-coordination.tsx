@@ -60,9 +60,9 @@ export function ModelCoordination({ projectId, companyId, packages, models, runs
     if (packageId) form.set('workPackageId', packageId); form.set('file', bcfFile);
     try {
       const response = await fetch('/api/construction/models/bcf', { method: 'POST', body: form, cache: 'no-store' });
-      const body = await response.json() as { ok?: boolean; error?: string; imported?: number; skipped?: number };
+      const body = await response.json() as { ok?: boolean; error?: string; imported?: number; updated?: number; skipped?: number };
       if (!response.ok || !body.ok) { setError(body.error ?? 'Could not import BCF topics.'); return; }
-      setMessage(`${body.imported} BCF topics imported; ${body.skipped} already present. Imported topics require local engineering review.`);
+      setMessage(`${body.imported} BCF topics added, ${body.updated} updated, ${body.skipped} unchanged. Comments, snapshots and viewpoints are retained; imported decisions still require local engineering review.`);
       setBcfFile(null); router.refresh();
     } catch { setError('Connection interrupted. Reopen this page to check the coordination register.'); }
     finally { setBusy(false); }
@@ -120,7 +120,7 @@ export function ModelCoordination({ projectId, companyId, packages, models, runs
     {issues.some((issue) => issue.clashDetection) && <ConstructionPanel><ConstructionPanelHeader title="Inspect detected contacts" subtitle="Open each recorded model and focus the exact linked element before engineering review." />
       <div className={styles.editor}>{issues.filter((issue) => issue.clashDetection).slice(0, 20).map((issue) => <div key={issue.id} className={styles.details}><strong>{issue.title}</strong><Button type="button" variant="secondary" onClick={() => inspect(issue.clashDetection!.modelAId, issue.clashDetection!.componentAId)}>Inspect first element</Button><Button type="button" variant="secondary" onClick={() => inspect(issue.clashDetection!.modelBId, issue.clashDetection!.componentBId)}>Inspect second element</Button></div>)}</div>
     </ConstructionPanel>}
-    {(canUpload || canExport) && <ConstructionPanel><ConstructionPanelHeader title="BCF 3.0 exchange" subtitle="Share design topics with BIM coordination tools. Exports include visible issues and IFC element IDs where available; models and private drawings stay in Propbrew." />
+    {(canUpload || canExport) && <ConstructionPanel><ConstructionPanelHeader title="BCF 3.0 exchange" subtitle="Share design topics, dated comments, snapshots, full viewpoints and local issue activity with BIM coordination tools. Models and private drawings stay in Propbrew." />
       <div className={styles.editor}>{canExport && <a href={`/api/construction/models/bcf?projectId=${encodeURIComponent(projectId)}`} download><Download size={16} aria-hidden="true" /> Export visible issues as BCFZIP</a>}
       {canUpload && <form className={styles.form} onSubmit={(event) => { void importBcf(event); }}>
         {packages.length > 0 && <label>Import into work package<select value={packageId} onChange={(event) => setPackageId(event.target.value)}><option value="">Whole project</option>{packages.map((pack) => <option key={pack.id} value={pack.id}>{pack.name}</option>)}</select></label>}

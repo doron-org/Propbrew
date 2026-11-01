@@ -12,10 +12,11 @@ import { db, validateWorkspaceRecordState } from '@/server/data/store';
 import { withWorkspaceState } from '@/server/data/workspace-postgres';
 import { operatingDateISO, operatingNowISO } from '@/server/operating-clock';
 import { rfiPackageAllowed } from './rfi-access';
+import { qualityIssueVisible } from './quality-access';
 import { detectModelFormat, type ModelFormat, type Point3 } from '@/domain/construction/model-clashes';
 import { compareMeshSurfaces, compareModelRevisions, parseModelMesh, type MeshElement } from '@/domain/construction/model-mesh';
 import { parseIfcMesh } from './ifc-model';
-import { createBcfZip, parseBcfZip, type BcfTopic } from '@/domain/construction/bcf';
+import { createBcfZip, parseBcfZip, type BcfComment, type BcfTopic } from '@/domain/construction/bcf';
 import type { Issue, Project } from '@/domain/construction/types';
 
 export type StoredModel = { id: string; tenantId: string; projectId: string; workPackageId?: string; discipline: string;
@@ -64,12 +65,12 @@ async function inWorkspace<T>(identity: CompanyPrincipal, fn: (client: PoolClien
     return runWithRecordContext({ state, domainTenantId: identity.company.id, mode: 'write', companyPrincipal: identity }, async () => ({ ...await fn(connection!), payload: state }));
   }, async (client) => { connection = client; await recheckCompanyMembership(client, identity); });
 }
-async function audit(identity: CompanyPrincipal, client: PoolClient, action: string, projectId: string, entityId: string, details: Record<string, unknown>) {
+async function audit(identity: CompanyPrincipal, client: PoolClient, action: string, projectId: string, entityId: string, details: Record<string, unknown>, entity = 'construction_model') {
   db.constructionAudit.push({ tenantId: identity.company.id, id: `au-model-${randomUUID()}`, seq: db.constructionAudit.length + 1,
     atISO: operatingNowISO(), actorId: identity.user.id, actorName: identity.user.name, actorRole: identity.actor.roles[0] ?? 'unknown',
-    action: 'record', entity: 'construction_model', entityRef: entityId, projectId, summary: action } as (typeof db.constructionAudit)[number]);
+    action: entity === 'construction_issue' ? 'import' : 'record', entity, entityRef: entityId, projectId, summary: action } as (typeof db.constructionAudit)[number]);
   await client.query('insert into audit_events(tenant_id,actor_subject,action,entity,entity_id,payload) values($1::uuid,$2,$3,$4,$5,$6::jsonb)',
-    [identity.company.id, identity.user.id, action, 'construction_model', entityId, JSON.stringify(details)]);
+    [identity.company.id, identity.user.id, action, entity, entityId, JSON.stringify(details)]);
 }
 function modelName(value: string, format: ModelFormat): string {
   const base = value.split(/[\\/]/).at(-1)?.replace(/[^a-zA-Z0-9 _.-]/g, '_').replace(/\.{2,}/g, '.').trim().slice(0, 115) || 'Coordination model';
@@ -199,12 +200,27 @@ export async function detectConstructionClashes(input: { expectedCompanyId: stri
   revalidatePath('/construction/quality'); return run;
 }
 
+function stableBcfGuid(value: string): string {
+  const hex = createHash('sha256').update(value).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
 function topicGuid(issue: Issue): string {
   if (issue.bcf?.guid) return issue.bcf.guid.toLowerCase();
   const suffix = issue.id.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)?.[0];
   if (suffix) return suffix;
-  const hex = createHash('sha256').update(issue.tenantId + ':' + issue.id).digest('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+  return stableBcfGuid(issue.tenantId + ':' + issue.id);
+}
+export async function readConstructionBcfSnapshot(issueId: string, viewpointGuid: string): Promise<{ bytes: Uint8Array; mediaType: string }> {
+  if (issueId.length > 100 || !uuid(viewpointGuid)) throw new ConstructionModelError('Snapshot unavailable.', 404);
+  const identity = await principal(false);
+  return inWorkspace(identity, async () => {
+    const issue = db.constructionIssues.find((row) => row.id === issueId && row.tenantId === identity.company.id && row.category === 'Design clash' && qualityIssueVisible(identity.actor, row));
+    const snapshot = issue?.bcf?.viewpoints?.find((row) => row.guid === viewpointGuid)?.snapshot;
+    if (!snapshot) throw new ConstructionModelError('Snapshot unavailable.', 404);
+    const bytes = Buffer.from(snapshot.base64, 'base64');
+    if (!bytes.length || bytes.length > 2 * 1024 * 1024) throw new ConstructionModelError('Snapshot unavailable.', 404);
+    return { value: { bytes: new Uint8Array(bytes), mediaType: snapshot.mediaType }, commit: false };
+  });
 }
 export async function exportConstructionBcf(projectId: string): Promise<{ name: string; bytes: Uint8Array; count: number }> {
   const identity = await principal(false);
@@ -215,18 +231,51 @@ export async function exportConstructionBcf(projectId: string): Promise<{ name: 
       rfiPackageAllowed(identity.actor, project, row.workPackageId));
     if (!issues.length) throw new ConstructionModelError('This project has no visible design conflicts to export.', 404);
     if (issues.length > 100) throw new ConstructionModelError('BCF export supports up to 100 visible topics. Narrow or archive the coordination register first.', 413);
-    const topics: BcfTopic[] = issues.map((issue) => ({ guid: topicGuid(issue), title: issue.title,
-      description: [issue.bcf?.description, issue.correctiveAction, issue.clashReview?.rationale].filter(Boolean).join('\n').slice(0, 2000),
-      status: issue.status === 'resolved' ? 'Resolved' : issue.status === 'in_progress' ? 'InProgress' : 'Open',
-      createdAtISO: `${issue.raisedISO}T00:00:00.000Z`,
-      componentIds: issue.clashDetection ? [issue.clashDetection.componentAId, issue.clashDetection.componentBId] : issue.bcf?.componentIds ?? [],
-      point: issue.clashDetection?.point }));
+    const topics: BcfTopic[] = issues.map((issue) => {
+      const activity = db.constructionAudit.filter((row) => row.tenantId === identity.company.id && row.projectId === project.id &&
+        row.entity === 'construction_issue' && row.entityRef === issue.id && row.action !== 'import');
+      const activityComments: BcfComment[] = activity.map((row) => {
+        const hash = createHash('sha256').update(`${identity.company.id}:${row.id}`).digest('hex');
+        return { guid: `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`,
+          dateISO: row.atISO, author: row.actorName, text: [row.summary, row.before && row.after ? `${row.before} → ${row.after}` : '', row.note].filter(Boolean).join(' · ').slice(0, 2000) };
+      });
+      const retainedHistory: BcfComment[] = [
+        ...(issue.bcf?.commentRevisions ?? []).map((entry) => ({
+          guid: stableBcfGuid(`${issue.id}:comment-revision:${entry.previous.guid}:${entry.savedAtISO}`),
+          dateISO: entry.savedAtISO, author: 'Propbrew',
+          text: `Earlier version of ${entry.previous.author}'s comment from ${entry.previous.dateISO}: ${entry.previous.text ?? 'Viewpoint only'}`.slice(0, 2000),
+        })),
+        ...(issue.bcf?.exchangeHistory ?? []).filter((entry) => entry.previousStatus && entry.previousStatus !== entry.status).map((entry) => ({
+          guid: stableBcfGuid(`${issue.id}:external-status:${entry.atISO}:${entry.previousStatus}:${entry.status}`),
+          dateISO: entry.atISO, author: 'Propbrew',
+          text: `External BCF status changed ${entry.previousStatus} → ${entry.status} when ${entry.actor} imported an update.`,
+        })),
+      ];
+      const commentGuids = new Set<string>();
+      const comments = [...issue.bcf?.comments ?? [], ...retainedHistory, ...activityComments].filter((comment) => {
+        if (commentGuids.has(comment.guid)) return false;
+        commentGuids.add(comment.guid); return true;
+      });
+      const latest = activity.at(-1);
+      return { guid: topicGuid(issue), title: issue.title,
+        description: [issue.bcf?.description, issue.correctiveAction, issue.clashReview?.rationale].filter(Boolean).join('\n').slice(0, 2000),
+        status: issue.status === 'resolved' ? 'Resolved' : issue.status === 'in_progress' ? 'InProgress' : 'Open',
+        topicType: issue.bcf?.topicType ?? 'Clash', createdAtISO: issue.bcf?.createdAtISO ?? `${issue.raisedISO}T00:00:00.000Z`,
+        createdAuthor: issue.bcf?.createdAuthor ?? 'Propbrew', modifiedAtISO: latest?.atISO ?? issue.bcf?.modifiedAtISO,
+        modifiedAuthor: latest?.actorName ?? issue.bcf?.modifiedAuthor,
+        componentIds: issue.clashDetection ? [issue.clashDetection.componentAId, issue.clashDetection.componentBId] : issue.bcf?.componentIds ?? [],
+        point: issue.clashDetection?.point ?? issue.bcf?.viewpoints?.[0]?.camera?.position,
+        comments, viewpoints: issue.bcf?.viewpoints };
+    });
     const hash = createHash('sha256').update(identity.company.id + ':' + project.id).digest('hex');
     const projectGuid = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
-    return { value: { name: `${project.code || 'project'}-coordination.bcfzip`, bytes: createBcfZip(project.name, projectGuid, topics), count: topics.length }, commit: false };
+    let bytes: Uint8Array;
+    try { bytes = createBcfZip(project.name, projectGuid, topics); }
+    catch (error) { throw new ConstructionModelError(error instanceof Error ? error.message : 'BCF export could not be assembled.', 413); }
+    return { value: { name: `${project.code || 'project'}-coordination.bcfzip`, bytes, count: topics.length }, commit: false };
   });
 }
-export async function importConstructionBcf(input: { expectedCompanyId: string; projectId: string; workPackageId?: string; bytes: Uint8Array }): Promise<{ imported: number; skipped: number }> {
+export async function importConstructionBcf(input: { expectedCompanyId: string; projectId: string; workPackageId?: string; bytes: Uint8Array }): Promise<{ imported: number; updated: number; skipped: number }> {
   const identity = await principal(true);
   if (identity.company.id !== input.expectedCompanyId) throw new ConstructionModelError('Your company changed. Reopen BCF import.', 409);
   let topics: BcfTopic[];
@@ -234,20 +283,61 @@ export async function importConstructionBcf(input: { expectedCompanyId: string; 
   const result = await inWorkspace(identity, async (client) => {
     const project = scopedConstructionProjectGet(identity.actor, input.projectId, 'create');
     if (!project || !rfiPackageAllowed(identity.actor, project, input.workPackageId) || identity.actor.constructionPackageIds !== undefined && !input.workPackageId) throw new ConstructionModelError('Choose an assigned project and work package.', 403);
-    let imported = 0, skipped = 0;
+    let imported = 0, updated = 0, skipped = 0;
     for (const topic of topics) {
-      if (db.constructionIssues.some((row) => row.tenantId === identity.company.id && row.projectId === project.id && row.bcf?.guid === topic.guid)) { skipped++; continue; }
-      db.constructionIssues.unshift({ tenantId: identity.company.id as Issue['tenantId'], id: `is-bcf-${randomUUID()}`, projectId: project.id,
+      const existing = db.constructionIssues.find((row) => row.tenantId === identity.company.id && row.projectId === project.id && row.bcf?.guid === topic.guid);
+      if (existing) {
+        if (existing.workPackageId !== input.workPackageId || !rfiPackageAllowed(identity.actor, project, existing.workPackageId))
+          throw new ConstructionModelError('An existing BCF topic belongs to another work package.', 409);
+        const previous = existing.bcf!, oldComments = previous.comments ?? [], oldViews = previous.viewpoints ?? [];
+        const comments = [...oldComments], revisions = [...previous.commentRevisions ?? []], views = [...oldViews];
+        const newerTopic = !previous.modifiedAtISO || !!topic.modifiedAtISO && topic.modifiedAtISO >= previous.modifiedAtISO;
+        const externalStatus = newerTopic ? topic.status : previous.externalStatus ?? topic.status;
+        let changed = newerTopic && (previous.externalStatus !== topic.status || previous.modifiedAtISO !== topic.modifiedAtISO);
+        for (const comment of topic.comments ?? []) {
+          const index = comments.findIndex((row) => row.guid === comment.guid);
+          if (index < 0) { comments.push(comment); changed = true; continue; }
+          if (JSON.stringify(comments[index]) === JSON.stringify(comment)) continue;
+          if (!comment.modifiedAtISO || comment.modifiedAtISO <= (comments[index].modifiedAtISO ?? comments[index].dateISO))
+            throw new ConstructionModelError('A BCF comment changed without a newer modification date.', 409);
+          revisions.push({ savedAtISO: operatingNowISO(), previous: comments[index] }); comments[index] = comment; changed = true;
+        }
+        for (const view of topic.viewpoints ?? []) {
+          const old = views.find((row) => row.guid === view.guid);
+          if (!old) { views.push(view); changed = true; continue; }
+          if (JSON.stringify(old) !== JSON.stringify(view)) throw new ConstructionModelError('An existing BCF viewpoint changed. Viewpoints are immutable; issue a new viewpoint.', 409);
+        }
+        if (!changed) { skipped++; continue; }
+        const atISO = operatingNowISO();
+        existing.bcf = { ...previous, description: newerTopic ? topic.description || previous.description : previous.description, externalStatus,
+          modifiedAtISO: newerTopic ? topic.modifiedAtISO ?? previous.modifiedAtISO : previous.modifiedAtISO,
+          modifiedAuthor: newerTopic ? topic.modifiedAuthor ?? previous.modifiedAuthor : previous.modifiedAuthor,
+          componentIds: newerTopic ? topic.componentIds : previous.componentIds,
+          comments, viewpoints: views, commentRevisions: revisions, importedAtISO: atISO,
+          exchangeHistory: [...previous.exchangeHistory ?? [], { atISO, actor: identity.user.name, action: 'updated' as const,
+            commentCount: comments.length, viewpointCount: views.length, status: externalStatus, previousStatus: previous.externalStatus }] };
+        await audit(identity, client, 'construction.bcf.topic_updated', project.id, existing.id,
+          { guid: topic.guid, comments: comments.length, viewpoints: views.length, previousStatus: previous.externalStatus, externalStatus }, 'construction_issue');
+        updated++; continue;
+      }
+      const atISO = operatingNowISO(), id = `is-bcf-${randomUUID()}`;
+      db.constructionIssues.unshift({ tenantId: identity.company.id as Issue['tenantId'], id, projectId: project.id,
         category: 'Design clash', title: topic.title, severity: 'medium', owner: 'Design coordination', raisedISO: operatingDateISO(),
         dueISO: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), status: 'open',
         location: topic.point?.map((value) => value.toFixed(2)).join(', ') ?? 'See BCF viewpoint',
         sourceReference: topic.componentIds[0] ?? 'External BCF topic', relatedReference: topic.componentIds[1] ?? 'External BCF topic',
-        workPackageId: input.workPackageId, bcf: { guid: topic.guid, source: 'BCF 3.0 import', importedAtISO: operatingNowISO(),
-          description: topic.description, externalStatus: topic.status, componentIds: topic.componentIds } });
+        workPackageId: input.workPackageId, bcf: { guid: topic.guid, source: 'BCF 3.0 import', importedAtISO: atISO,
+          description: topic.description, externalStatus: topic.status, componentIds: topic.componentIds,
+          createdAtISO: topic.createdAtISO, createdAuthor: topic.createdAuthor, modifiedAtISO: topic.modifiedAtISO,
+          modifiedAuthor: topic.modifiedAuthor, topicType: topic.topicType, comments: topic.comments, viewpoints: topic.viewpoints,
+          exchangeHistory: [{ atISO, actor: identity.user.name, action: 'imported', commentCount: topic.comments?.length ?? 0,
+            viewpointCount: topic.viewpoints?.length ?? 0, status: topic.status }] } });
+      await audit(identity, client, 'construction.bcf.topic_imported', project.id, id,
+        { guid: topic.guid, comments: topic.comments?.length ?? 0, viewpoints: topic.viewpoints?.length ?? 0, externalStatus: topic.status }, 'construction_issue');
       imported++;
     }
-    await audit(identity, client, 'construction.bcf.imported', project.id, project.id, { imported, skipped, workPackageId: input.workPackageId ?? null });
-    return { value: { imported, skipped } };
+    await audit(identity, client, 'construction.bcf.imported', project.id, project.id, { imported, updated, skipped, workPackageId: input.workPackageId ?? null });
+    return { value: { imported, updated, skipped } };
   });
   revalidatePath('/construction/quality'); return result;
 }

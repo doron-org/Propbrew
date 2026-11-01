@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { unzipSync, zipSync } from 'fflate';
 import { createBcfZip, parseBcfZip } from '@/domain/construction/bcf';
 import { detectModelFormat, compareModels } from '@/domain/construction/model-clashes';
 import { evaluateConstructionForecasts, type ForecastSnapshot } from '@/domain/construction/forecast-evaluation';
@@ -34,8 +35,45 @@ describe('native construction BIM exchange and forecast evidence', () => {
     const guid = '12345678-1234-4234-8234-123456789abc';
     const zip = createBcfZip('Lagos tower', guid, [{ guid, title: 'Duct and beam overlap', description: 'Check level 4 coordination',
       status: 'Open', createdAtISO: '2026-10-31T10:00:00.000Z', componentIds: ['0sfBnoLAb0R9H9P$iaZWyE'], point: [1, 2, 3] }]);
-    expect(parseBcfZip(zip)).toEqual([{ guid, title: 'Duct and beam overlap', description: 'Check level 4 coordination', status: 'Open',
-      createdAtISO: '2026-10-31T10:00:00.000Z', componentIds: ['0sfBnoLAb0R9H9P$iaZWyE'], point: [1, 2, 3] }]);
+    expect(parseBcfZip(zip)).toMatchObject([{ guid, title: 'Duct and beam overlap', description: 'Check level 4 coordination', status: 'Open',
+      createdAtISO: '2026-10-31T10:00:00.000Z', componentIds: ['0sfBnoLAb0R9H9P$iaZWyE'], point: [1, 2, 3],
+      viewpoints: [{ guid, camera: { kind: 'Perspective', position: [1, 2, 3] } }] }]);
+  });
+
+  it('keeps multiple complete viewpoints, snapshot bytes and dated discussion across two BCF exports', () => {
+    const guid = '12345678-1234-4234-8234-123456789abc', first = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', second = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9z7xQAAAAASUVORK5CYII=';
+    const camera = (id: string, x: number) => `<VisualizationInfo Guid="${id}"><Components><Selection><Component IfcGuid="0sfBnoLAb0R9H9P$iaZWyE"/></Selection><Visibility DefaultVisibility="true"><Exceptions><Component IfcGuid="0sfBnoLAb0R9H9P$iaZWyE"/></Exceptions></Visibility></Components><PerspectiveCamera><CameraViewPoint><X>${x}</X><Y>2</Y><Z>3</Z></CameraViewPoint><CameraDirection><X>0</X><Y>0</Y><Z>-1</Z></CameraDirection><CameraUpVector><X>0</X><Y>1</Y><Z>0</Z></CameraUpVector><FieldOfView>60</FieldOfView><AspectRatio>1.6</AspectRatio></PerspectiveCamera><ClippingPlanes><ClippingPlane><Location><X>0</X><Y>0</Y><Z>0</Z></Location><Direction><X>0</X><Y>0</Y><Z>1</Z></Direction></ClippingPlane></ClippingPlanes></VisualizationInfo>`;
+    const topic = { guid, title: 'Review duct route', description: 'MEP coordination', status: 'InProgress', topicType: 'Clash',
+      createdAtISO: '2026-10-31T10:00:00.000Z', createdAuthor: 'Consultant A', modifiedAtISO: '2026-10-31T11:00:00.000Z', modifiedAuthor: 'Consultant B',
+      componentIds: ['0sfBnoLAb0R9H9P$iaZWyE'], comments: [
+        { guid: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', dateISO: '2026-10-31T10:30:00.000Z', author: 'Consultant A', text: 'Please reroute the duct.', viewpointGuid: first },
+        { guid: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', dateISO: '2026-10-31T11:00:00.000Z', author: 'Consultant B', text: 'Revised viewpoint attached.', viewpointGuid: second },
+      ], viewpoints: [
+        { guid: first, fileName: 'first.bcfv', index: 0, xml: camera(first, 1), componentIds: ['0sfBnoLAb0R9H9P$iaZWyE'], snapshot: { fileName: 'first.png', mediaType: 'image/png' as const, base64: png } },
+        { guid: second, fileName: 'second.bcfv', index: 1, xml: camera(second, 4), componentIds: ['0sfBnoLAb0R9H9P$iaZWyE'] },
+      ] };
+    const one = parseBcfZip(createBcfZip('Lagos tower', guid, [topic]));
+    expect(one[0].comments).toEqual(topic.comments);
+    expect(one[0].viewpoints?.map((view) => view.xml)).toEqual(topic.viewpoints.map((view) => view.xml));
+    expect(one[0].viewpoints?.[0].snapshot?.base64).toBe(png);
+    expect(one[0].viewpoints?.[0].camera?.position).toEqual([1, 2, 3]);
+    expect(one[0].viewpoints?.[1].camera?.position).toEqual([4, 2, 3]);
+    expect(parseBcfZip(createBcfZip('Lagos tower', guid, one))[0]).toEqual(one[0]);
+    const missing = unzipSync(createBcfZip('Lagos tower', guid, [topic]));
+    delete missing[`${guid}/first.png`];
+    expect(() => parseBcfZip(zipSync(missing))).toThrow(/snapshot is missing/);
+  });
+
+  it('preserves a snapshot-only BCF viewpoint and rejects images beyond the standard display limit', () => {
+    const guid = '12345678-1234-4234-8234-123456789abc', viewGuid = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9z7xQAAAAASUVORK5CYII=';
+    const topic = { guid, title: 'Check service opening', description: '', status: 'Open', createdAtISO: '2026-10-31T10:00:00.000Z', componentIds: [],
+      viewpoints: [{ guid: viewGuid, componentIds: [], snapshot: { fileName: 'site.png', mediaType: 'image/png' as const, base64: png } }] };
+    expect(parseBcfZip(createBcfZip('Lagos tower', guid, [topic]))[0].viewpoints?.[0]).toMatchObject({ guid: viewGuid, snapshot: { base64: png } });
+    const oversized = Buffer.from(png, 'base64'); oversized.writeUInt32BE(1501, 16);
+    expect(() => createBcfZip('Lagos tower', guid, [{ ...topic, viewpoints: [{ ...topic.viewpoints[0], snapshot: { ...topic.viewpoints[0].snapshot, base64: oversized.toString('base64') } }] }]))
+      .toThrow(/snapshot is invalid/);
   });
 
   it('extracts only actual PDF text layers with page numbers', async () => {

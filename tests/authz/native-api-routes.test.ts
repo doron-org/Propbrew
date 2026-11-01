@@ -17,6 +17,7 @@ describe('native API proxy allowlist', () => {
     expect(nativeApiRouteAllowed('/api/construction/field-photos/00000000-0000-4000-8000-000000000000')).toBe(true);
     expect(nativeApiRouteAllowed('/api/construction/models/00000000-0000-4000-8000-000000000000/mesh')).toBe(true);
     expect(nativeApiRouteAllowed('/api/construction/models/revisions')).toBe(true);
+    expect(nativeApiRouteAllowed('/api/construction/bcf/snapshots/is-bcf-00000000-0000-4000-8000-000000000000/00000000-0000-4000-8000-000000000000')).toBe(true);
   });
 
   it('keeps unrelated or malformed API paths closed', () => {

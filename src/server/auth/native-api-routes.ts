@@ -5,6 +5,7 @@ const constructionDrawing = new RegExp(`^/api/construction/drawings/${fileId}$`,
 const constructionHandover = /^\/api\/construction\/handover\/chp-[0-9a-f-]{36}$/i;
 const constructionEvidence = /^\/api\/construction\/evidence\/sync-[0-9a-f]{32}\/(?:[0-9]|1[0-9])$/i;
 const constructionFieldPhoto = new RegExp(`^/api/construction/field-photos/${fileId}$`, 'i');
+const constructionBcfSnapshot = new RegExp(`^/api/construction/bcf/snapshots/is-(?:bcf|quality|clash)-${fileId}/${fileId}$`, 'i');
 
 /** The native-auth proxy permits only company-aware API routes. The routes
  * themselves still perform session, company and record-level authorization. */
@@ -33,5 +34,6 @@ export function nativeApiRouteAllowed(pathname: string): boolean {
     || constructionDrawing.test(pathname)
     || constructionEvidence.test(pathname)
     || constructionFieldPhoto.test(pathname)
+    || constructionBcfSnapshot.test(pathname)
     || constructionHandover.test(pathname);
 }
