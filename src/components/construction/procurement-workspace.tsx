@@ -176,7 +176,7 @@ function ReceiveDialog({ order, onClose, onDone }: { order: OrderRow; onClose: (
       <div className={styles.notice}><div><p className={styles.title}>{order.item}</p><p className={styles.metadata}>{order.ref} · {order.vendorName}</p><dl className={styles.facts}><div><dt>Order value · NGN</dt><dd>{naira(order.valueMinor)}</dd></div><div><dt>Received / ordered</dt><dd>{order.deliveredQty} / {order.qty} {order.unit}</dd></div><div><dt>Outstanding</dt><dd>{outstanding} {order.unit}</dd></div></dl></div></div>
       <label htmlFor={fieldId} className="pb-form-label">Quantity physically received · {order.unit}</label>
       <input id={fieldId} aria-label="Quantity received" value={qty} onChange={(e) => setQty(e.target.value)} inputMode="decimal" type="number" min="0" max={outstanding} step="any" className={styles.control} autoFocus />
-      <p className="text-[12px] text-text-3 mt-1.5">Confirm the physically received quantity. This books stock and pro-rata actual cost against {order.ref}&apos;s cost code. It does not verify goods independently or make a bank payment.</p>
+      <p className="text-[12px] text-text-3 mt-1.5">Confirm the physically received quantity. This books stock and pro-rata actual cost against {order.ref}&apos;s cost code. It does not verify goods independently.</p>
       {error && <div role="alert" className="text-[12px] text-negative mt-2">{error}</div>}
       <div className="flex justify-end gap-2 mt-4"><Button type="button" disabled={pending} onClick={onClose} >Cancel</Button><Button variant="primary" type="button" onClick={submit} disabled={pending || !(Number(qty) > 0) || Number(qty) > outstanding} >{pending ? 'Booking…' : 'Confirm goods receipt'}</Button></div>
     </ConstructionDialog>

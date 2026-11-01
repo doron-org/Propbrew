@@ -1,7 +1,7 @@
 export type OnboardingStatus = 'pending_review' | 'approved' | 'rejected' | 'suspended';
 export type SubcontractorOnboarding = {
   tenantId: string; id: string; name: string; trade: string; contactName: string; phoneE164: string;
-  cacNumber: string; insuranceExpiryISO?: string; bankVerified: boolean; hseInducted: boolean;
+  cacNumber: string; insuranceExpiryISO?: string; hseInducted: boolean;
   projectIds: string[]; status: OnboardingStatus; submittedBy: string; submittedAtISO: string;
   reviewedBy?: string; reviewedAtISO?: string; reviewNote?: string;
 };

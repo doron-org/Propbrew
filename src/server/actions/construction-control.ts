@@ -13,7 +13,6 @@ import { db } from '@/server/data/store';
 import { getActor } from '@/server/session';
 import { nowISO } from '@/server/clock';
 import { constructionControl } from '@/server/construction-control';
-import { parseBankCsv } from '@/server/payments';
 import { constructionDrawingVisible } from '@/server/construction/drawings';
 
 export type ConstructionControlResult = { ok: true; id?: string; message?: string } | { ok: false; error: string };
@@ -48,7 +47,7 @@ function audit(actor: Actor, action: 'approve' | 'reject' | 'issue' | 'post_cost
 const subcontractorSchema = z.object({
   name: z.string().trim().min(2).max(140), trade: z.string().trim().min(2).max(100), contactName: z.string().trim().min(2).max(120),
   phoneE164: z.string().trim().regex(/^\+234[789][01]\d{8}$/), cacNumber: z.string().trim().min(5).max(30).regex(/^[A-Za-z0-9/-]+$/),
-  insuranceExpiryISO: isoDate.optional(), bankVerified: z.boolean(), hseInducted: z.boolean(), projectIds: z.array(id).min(1).max(20),
+  insuranceExpiryISO: isoDate.optional(), hseInducted: z.boolean(), projectIds: z.array(id).min(1).max(20),
 }).strict();
 
 export async function submitSubcontractorOnboarding(input: z.input<typeof subcontractorSchema>): Promise<ConstructionControlResult> {
@@ -71,7 +70,7 @@ export async function decideSubcontractorOnboarding(onboardingId: string, decisi
     if (!profileAllowed(access.actor, ['project-director', 'project-manager', 'construction-hse'])) return { ok: false, error: 'Your Construction profile cannot decide subcontractor onboarding.' };
     const row = constructionControl(access.actor.tenantId!).subcontractors.find((item) => item.id === onboardingId && inConstructionScope(access.actor, { ...item, subcontractorId: item.id }));
     if (!row || !['pending_review', 'approved'].includes(row.status)) return { ok: false, error: 'Reviewable onboarding record not found.' };
-    if (decision === 'approved' && (!row.bankVerified || !row.hseInducted || row.insuranceExpiryISO && row.insuranceExpiryISO < nowISO().slice(0, 10))) return { ok: false, error: 'Bank verification, HSE induction and current insurance are required before approval.' };
+    if (decision === 'approved' && (!row.hseInducted || row.insuranceExpiryISO && row.insuranceExpiryISO < nowISO().slice(0, 10))) return { ok: false, error: 'HSE induction and current insurance are required before approval.' };
     row.status = decision; row.reviewedBy = access.actor.userId; row.reviewedAtISO = nowISO(); row.reviewNote = note.trim().slice(0, 500) || undefined;
     audit(access.actor, decision === 'approved' ? 'approve' : 'reject', 'subcontractor_onboarding', row.id, row.projectIds[0], `${row.name} ${decision}`);
     refresh(); return { ok: true, id: row.id, message: `Subcontractor ${decision}.` };
@@ -188,19 +187,9 @@ export async function decideProcurementPayment(paymentId: string, decision: 'app
     const row = scopedSidecar(access.actor, constructionControl(access.actor.tenantId!).payments, (item) => item.id === paymentId && ['pending_match', 'pending_approval'].includes(item.status)); if (!row) return { ok: false, error: 'Reviewable payment not found.' };
     if (decision === 'approved' && (!row.threeWayMatched || row.status !== 'pending_approval')) return { ok: false, error: 'Complete the three-way match before finance approval.' };
     row.status = decision; row.reviewedBy = access.actor.userId; row.reviewedAtISO = nowISO(); row.note = note.trim().slice(0, 500) || row.note;
-    audit(access.actor, decision === 'approved' ? 'approve' : 'reject', 'procurement_payment', row.ref, row.projectId, `${row.ref} ${decision}`, row.payableMinor); refresh(); return { ok: true, id: row.id, message: `${row.ref} ${decision}. No bank transfer has been executed.` };
+    audit(access.actor, decision === 'approved' ? 'approve' : 'reject', 'procurement_payment', row.ref, row.projectId, `${row.ref} ${decision}`, row.payableMinor); refresh(); return { ok: true, id: row.id, message: `${row.ref} ${decision}.` };
   }, 'construction');
 }
-export async function markProcurementPaymentPaid(paymentId: string, paymentReference: string): Promise<ConstructionControlResult> {
-  return withDurableMutation(async () => {
-    const access = await gate('transition'); if (!access.actor) return { ok: false, error: access.error ?? 'Access denied.' };
-    if (!profileAllowed(access.actor, ['construction-finance'])) return { ok: false, error: 'Only Construction finance can record the bank payment reference.' };
-    const reference = paymentReference.trim(); const row = scopedSidecar(access.actor, constructionControl(access.actor.tenantId!).payments, (item) => item.id === paymentId && item.status === 'approved');
-    if (!row || reference.length < 3 || reference.length > 160) return { ok: false, error: 'Approved payment and bank reference are required.' };
-    row.status = 'paid'; row.paymentReference = reference; row.paidAtISO = nowISO(); audit(access.actor, 'post_cost', 'procurement_payment', row.ref, row.projectId, `${row.ref} marked paid · ${reference}`, row.payableMinor); refresh(); return { ok: true, id: row.id, message: `${row.ref} marked paid from the recorded bank reference.` };
-  }, 'construction');
-}
-
 const handoverSchema = z.object({
   packId: id.optional(), projectId: id, title: z.string().trim().min(3).max(160), approvalId: id.optional(),
   items: z.array(z.object({ requirement: z.enum(HANDOVER_REQUIREMENTS.map((row) => row.key)), docId: id }).strict()).max(HANDOVER_REQUIREMENTS.length),
@@ -262,56 +251,6 @@ export async function approveConstructionHandoverPack(packId: string): Promise<C
   }, 'construction');
 }
 
-function financeOnly(actor: Actor) {
-  const access = actor.companyAccess;
-  return !access || access.companyRole === 'owner' || access.companyRole === 'admin' || access.operationalProfileId === 'construction-finance';
-}
-function unusedDebit(state: ReturnType<typeof constructionControl>, bankLineId: string, amountMinor: number) {
-  const line = state.bankDebits.find((row) => row.id === bankLineId && row.status === 'approved' && row.amountMinor === amountMinor);
-  if (!line || state.claims.some((row) => row.bankLineId === bankLineId) || state.retentionReleases.some((row) => row.bankLineId === bankLineId)) return undefined;
-  return line;
-}
-export async function importConstructionBankDebits(csv: string): Promise<ConstructionControlResult> {
-  return withDurableMutation(async () => {
-    const access = await gate('create'); if (!access.actor) return { ok: false, error: access.error ?? 'Access denied.' };
-    if (!financeOnly(access.actor)) return { ok: false, error: 'Only Construction finance can import payment statement lines.' };
-    if (csv.length > 1_000_000) return { ok: false, error: 'Statement is too large.' };
-    let lines: ReturnType<typeof parseBankCsv>;
-    try { lines = parseBankCsv(csv).filter((row) => row.direction === 'debit' && row.amountMinor > 0); }
-    catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Invalid bank CSV.' }; }
-    if (!lines.length) return { ok: false, error: 'No positive debit lines found.' };
-    const state = constructionControl(access.actor.tenantId!);
-    if (new Set(lines.map((row) => row.reference)).size !== lines.length || lines.some((row) => state.bankDebits.some((saved) => saved.reference === row.reference))) return { ok: false, error: 'Statement contains a duplicate bank reference.' };
-    for (const row of lines) state.bankDebits.unshift({ tenantId: access.actor.tenantId!, id: `cbd-${randomUUID()}`, date: row.date, reference: row.reference, amountMinor: row.amountMinor, narration: row.narration, importedBy: access.actor.userId, importedAtISO: nowISO(), status: 'pending_review' });
-    audit(access.actor, 'issue', 'construction_bank_statement', lines[0].reference, undefined, `Imported ${lines.length} debit statement lines for independent review`); refresh();
-    return { ok: true, message: `${lines.length} debit lines imported for independent review.` };
-  }, 'construction');
-}
-export async function reviewConstructionBankDebit(bankLineId: string, decision: 'approved' | 'rejected'): Promise<ConstructionControlResult> {
-  return withDurableMutation(async () => {
-    const access = await gate('transition'); if (!access.actor) return { ok: false, error: access.error ?? 'Access denied.' };
-    if (!financeOnly(access.actor)) return { ok: false, error: 'Only Construction finance can review a bank line.' };
-    const row = constructionControl(access.actor.tenantId!).bankDebits.find((item) => item.id === bankLineId && item.status === 'pending_review');
-    if (!row || row.importedBy === access.actor.userId) return { ok: false, error: 'A different finance member must review this imported bank line.' };
-    row.status = decision; row.reviewedBy = access.actor.userId; row.reviewedAtISO = nowISO();
-    audit(access.actor, decision === 'approved' ? 'approve' : 'reject', 'construction_bank_line', row.reference, undefined, `Bank debit ${decision}`, row.amountMinor); refresh();
-    return { ok: true, id: row.id, message: `Bank debit ${decision}.` };
-  }, 'construction');
-}
-export async function confirmConstructionClaimPayment(claimId: string, bankLineId: string): Promise<ConstructionControlResult> {
-  return withDurableMutation(async () => {
-    const access = await gate('transition'); if (!access.actor) return { ok: false, error: access.error ?? 'Access denied.' };
-    if (!financeOnly(access.actor)) return { ok: false, error: 'Only Construction finance can reconcile a claim payment.' };
-    const state = constructionControl(access.actor.tenantId!);
-    const row = scopedSidecar(access.actor, state.claims, (item) => item.id === claimId && item.status === 'approved' && item.certifiedMinor !== undefined);
-    if (!row || !row.certifiedMinor || row.certifiedMinor <= 0) return { ok: false, error: 'An approved positive claim is required.' };
-    const line = unusedDebit(state, bankLineId, row.certifiedMinor);
-    if (!line) return { ok: false, error: 'Choose an unused, independently approved bank debit for the exact net certified amount.' };
-    row.status = 'paid'; row.bankLineId = line.id; row.paymentReference = line.reference; row.paidAtISO = nowISO(); row.paidBy = access.actor.userId;
-    audit(access.actor, 'post_cost', 'construction_claim', row.ref, row.projectId, `Bank-confirmed claim payment ${line.reference}`, row.certifiedMinor); refresh();
-    return { ok: true, id: row.id, message: `${row.ref} reconciled to bank debit ${line.reference}.` };
-  }, 'construction');
-}
 export async function requestConstructionRetentionRelease(claimId: string, amountNaira: number, reason: string): Promise<ConstructionControlResult> {
   return withDurableMutation(async () => {
     const access = await gate('create'); if (!access.actor) return { ok: false, error: access.error ?? 'Access denied.' };
@@ -339,19 +278,4 @@ export async function decideConstructionRetentionRelease(releaseId: string, deci
     return { ok: true, id: row.id, message: `${row.ref} ${decision}.` };
   }, 'construction');
 }
-export async function confirmConstructionRetentionPayment(releaseId: string, bankLineId: string): Promise<ConstructionControlResult> {
-  return withDurableMutation(async () => {
-    const access = await gate('transition'); if (!access.actor) return { ok: false, error: access.error ?? 'Access denied.' };
-    if (!financeOnly(access.actor)) return { ok: false, error: 'Only Construction finance can reconcile retention payment.' };
-    const state = constructionControl(access.actor.tenantId!);
-    const row = scopedSidecar(access.actor, state.retentionReleases, (item) => item.id === releaseId && item.status === 'approved');
-    if (!row) return { ok: false, error: 'Approved release unavailable.' };
-    const line = unusedDebit(state, bankLineId, row.amountMinor);
-    if (!line) return { ok: false, error: 'Choose an unused approved bank debit for the exact release amount.' };
-    row.status = 'paid'; row.bankLineId = line.id; row.paymentReference = line.reference; row.paidAtISO = nowISO();
-    audit(access.actor, 'post_cost', 'retention_release', row.ref, row.projectId, `Bank-confirmed retention release ${line.reference}`, row.amountMinor); refresh();
-    return { ok: true, id: row.id, message: `${row.ref} paid and reconciled to ${line.reference}.` };
-  }, 'construction');
-}
-
 export type { EvidenceSubject };

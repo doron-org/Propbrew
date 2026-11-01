@@ -53,7 +53,7 @@ export function FxWorkspace({ rows, positions, rates, table, unrealizedMinor, sp
             <h2 className="text-[20px] font-medium tracking-[-0.02em] leading-tight mt-0.5">
               {rows.length === 0 ? 'No open foreign commitments' : unrealizedMinor === 0 ? 'No net unrealized FX movement' : <>{naira(Math.abs(unrealizedMinor))} unrealized FX <span style={{ color: toneVar(netPnl.tone) }}>{netPnl.label}</span></>}
             </h2>
-            <div className="text-[14px] text-text-3 mt-0.5">{naira(spotExposureMinor)} of undelivered foreign commitments · estimated exposure, not a verified bank-settled payable balance</div>
+            <div className="text-[14px] text-text-3 mt-0.5">{naira(spotExposureMinor)} of undelivered foreign commitments · estimated exposure, not a confirmed settlement balance</div>
           </div>
           {/* Reporting-currency toggle */}
           <div className="ml-auto flex items-center gap-1 flex-none rounded-lg p-1 bg-surface-2 border border-border" aria-label="Reporting currency">

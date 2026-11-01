@@ -105,7 +105,7 @@ export function CommandCenter({ confidence, projects, signals, deliveries, kpis,
               <Link href="/construction/procurement"><Truck size={20} aria-hidden="true" /><div><strong>{deliveries.late.length} late deliver{deliveries.late.length === 1 ? 'y' : 'ies'}</strong><p>{deliveries.today.length} due today · {deliveries.upcoming.length} upcoming.</p></div><ArrowRight size={18} aria-hidden="true" /></Link>
               <Link href="/construction/risk"><TriangleAlert size={20} aria-hidden="true" /><div><strong>{activeSignals.length} active signal{activeSignals.length === 1 ? '' : 's'}</strong><p>Review evidence, recommendations and acknowledgement state.</p></div><ArrowRight size={18} aria-hidden="true" /></Link>
             </div>
-            <div className={styles.footnote}><Info size={16} aria-hidden="true" />No signals recorded does not independently confirm that a project is on plan. Open purchase orders are commitments, not bank payments.</div>
+            <div className={styles.footnote}><Info size={16} aria-hidden="true" />No signals recorded does not independently confirm that a project is on plan. Open purchase orders are commitments, not confirmed payments.</div>
           </ConstructionPanel>
         </div> },
         { id: 'operations', label: 'Projects & deliveries', content: <div className="pb-section">

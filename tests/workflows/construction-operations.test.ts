@@ -15,7 +15,7 @@ beforeEach(() => session.actor.mockResolvedValue(manager()));
 describe('Construction commercial operating loop', () => {
   it('requires onboarding compliance before subcontractor approval', async () => {
     const project = db.constructionProjects[0];
-    const created = await operations.submitSubcontractorOnboarding({ name: 'QA Build Nigeria Ltd', trade: 'Concrete works', contactName: 'Ada Test', phoneE164: '+2348012345678', cacNumber: `RCQA${Date.now()}`, bankVerified: true, hseInducted: true, projectIds: [project.id] });
+    const created = await operations.submitSubcontractorOnboarding({ name: 'QA Build Nigeria Ltd', trade: 'Concrete works', contactName: 'Ada Test', phoneE164: '+2348012345678', cacNumber: `RCQA${Date.now()}`, hseInducted: true, projectIds: [project.id] });
     expect(created.ok).toBe(true); if (!created.ok) return;
     const row = constructionControl(manager().tenantId!).subcontractors.find((item) => item.id === created.id)!;
     expect(row.status).toBe('pending_review');
@@ -44,7 +44,7 @@ describe('Construction commercial operating loop', () => {
     expect((await operations.decideProcurementPayment(payment.id, 'approved')).ok).toBe(false);
     expect((await operations.matchProcurementPayment(payment.id)).ok).toBe(true);
     expect((await operations.decideProcurementPayment(payment.id, 'approved')).ok).toBe(true);
-    expect((await operations.markProcurementPaymentPaid(payment.id, 'BANK-QA-001')).ok).toBe(true);
-    expect(payment.status).toBe('paid'); expect(payment.paymentReference).toBe('BANK-QA-001');
+    expect(payment.status).toBe('approved');
+    expect(payment.paymentReference).toBeUndefined();
   });
 });

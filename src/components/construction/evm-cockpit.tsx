@@ -131,7 +131,7 @@ export function EvmCockpit({ views }: { views: EvmView[] }) {
 
               {/* Cash requirement */}
               <ConstructionPanel>
-                <div className={styles.header}><CardHeader title="Modelled cash requirement" subtitle="Open purchase-order commitments · not a bank cash-flow or payment schedule" /></div><div className={styles.body}>
+                <div className={styles.header}><CardHeader title="Modelled cash requirement" subtitle="Open purchase-order commitments · not a payment schedule" /></div><div className={styles.body}>
                 <ul className={styles.chartRows}>
                   {v.cashByMonth.map((m) => {
                     const max = Math.max(1, ...v.cashByMonth.map((x) => x.minor));

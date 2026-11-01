@@ -81,7 +81,7 @@ export function useConstructionReview(refresh: () => void, flash: (message: stri
   };
   const confirmation = review ? <ConstructionDialog title="Review construction change" onClose={() => setReview(null)} pending={pending}>
     <CardHeader title={review.title} subtitle="Confirm only after checking the source record and your approval authority." />
-    <div className={shared.notice}><Info size={18} /><p>{review.detail ?? 'This updates the construction record. Review quantities, dates and any financial or safety consequences before continuing.'}<span>Rules-based recommendations are advisory. This confirmation does not verify physical work or execute a bank payment.</span></p></div>
+    <div className={shared.notice}><Info size={18} /><p>{review.detail ?? 'This updates the construction record. Review quantities, dates and any financial or safety consequences before continuing.'}<span>Rules-based recommendations are advisory. This confirmation does not verify physical work.</span></p></div>
     {error && <div className={shared.feedback} role="alert">{error}</div>}
     <div className={shared.actions}><Button type="button" onClick={() => setReview(null)} disabled={pending}>Cancel</Button><Button type="button" variant="primary" icon={<Check size={16} />} onClick={confirm} disabled={pending}>{pending ? 'Saving…' : 'Confirm change'}</Button></div>
   </ConstructionDialog> : null;

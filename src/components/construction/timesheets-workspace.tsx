@@ -157,7 +157,7 @@ function RejectDialog({ sheet, onClose, onDone }: { sheet: SheetRow; onClose: ()
     <ConstructionDialog title={"Reject timesheet"} onClose={onClose} pending={pending}>
       <div className={styles.stack}><Card><CardHeader title={`${sheet.ref} · ${sheet.workerName}`} subtitle={`${sheet.normalHours} normal hours + ${sheet.overtimeHours} overtime hours · ${exact(sheet.costMinor)}`} /></Card>
       <label className={styles.field}>Reason (required)<textarea aria-label="Reason (required)" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus placeholder="e.g. Overtime not pre-authorised for this week" /></label>
-      <p className={styles.notice}>Review the labour record and rejection reason before confirming. No wages are paid or bank transfer executed by this form.</p>
+      <p className={styles.notice}>Review the labour record and rejection reason before confirming. This form only posts a labour cost record.</p>
       {error && <div role="alert" className={styles.error}>{error}</div>}
       <div className={styles.actions}><Button type="button" disabled={pending} onClick={onClose} >Cancel</Button><Button variant="primary" type="button" onClick={submit} disabled={pending || !reason.trim()} >{pending ? 'Saving…' : 'Reject'}</Button></div></div>
     </ConstructionDialog>

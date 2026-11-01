@@ -66,7 +66,7 @@ async function inviteRole(owner: Page, browser: Browser, id: string, profile: st
   return { context, member };
 }
 
-test('a saved Lagos project mobilises, isolates roles and reconciles a certified claim', async ({ page, browser }) => {
+test('a saved Lagos project mobilises, isolates roles and certifies a claim', async ({ page, browser }) => {
   test.setTimeout(420_000);
   const id = randomUUID().slice(0, 8);
   const firstName = `Lekki acceptance build ${id}`;
@@ -117,7 +117,6 @@ test('a saved Lagos project mobilises, isolates roles and reconciles a certified
   await sub.getByLabel('CAC reference', { exact: true }).fill(`RC${id.toUpperCase()}`);
   await sub.getByLabel('Insurance expiry', { exact: true }).fill(future(365));
   await sub.getByRole('combobox', { name: 'Assigned project', exact: true }).selectOption({ label: firstName });
-  await sub.getByLabel('Bank-account name verified').check();
   await sub.getByLabel('HSE induction completed').check();
   await sub.getByRole('button', { name: 'Submit onboarding', exact: true }).click();
   await expect(page.getByRole('table')).toContainText(subcontractorName);
@@ -140,8 +139,6 @@ test('a saved Lagos project mobilises, isolates roles and reconciles a certified
       memberships.push(await inviteRole(page, browser, id, profile, label, assignment));
     }
     memberships.push(await inviteRole(page, browser, id, 'quantity-surveyor', 'Assigned construction projects', firstName));
-    memberships.push(await inviteRole(page, browser, id, 'construction-finance', undefined, undefined, 'finance-importer'));
-    memberships.push(await inviteRole(page, browser, id, 'construction-finance', undefined, undefined, 'finance-reviewer'));
     const [client, consultant, contractor, field] = memberships.slice(1).map((row) => row.member);
     for (const member of [client, consultant, contractor, field]) {
       await member.goto('/construction/projects');
@@ -193,26 +190,10 @@ test('a saved Lagos project mobilises, isolates roles and reconciles a certified
     await director.getByRole('row', { name: new RegExp(subcontractorName) }).last().getByRole('button', { name: 'Approve certificate', exact: true }).click();
     await expect(director.getByRole('row', { name: new RegExp(subcontractorName) }).last()).toContainText('Approved');
 
-    const importer = memberships[6].member;
-    const reviewer = memberships[7].member;
-    const bankRef = `BANK-${id.toUpperCase()}`;
-    await importer.goto('/construction/operations');
-    await importer.getByRole('tab', { name: 'Claim closeout', exact: true }).click();
-    const csv = `date,reference,amount,direction,narration\n${future(-1)},${bankRef},90250000,debit,Certified construction claim`;
-    await importer.getByRole('tabpanel', { name: 'Claim closeout' }).locator('input[type="file"]').setInputFiles({ name: 'disposable-bank.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
-    await expect(importer.getByText(bankRef, { exact: false })).toBeVisible();
-    const importedDebit = importer.getByText(bankRef, { exact: false }).first().locator('xpath=ancestor::div[contains(@class,"listEntry")][1]');
-    await importedDebit.getByRole('button', { name: 'Approve debit', exact: true }).click();
-    await expect(importer.getByRole('status')).toContainText('A different finance member must review this imported bank line.');
-    await reviewer.goto('/construction/operations');
-    await reviewer.getByRole('tab', { name: 'Claim closeout', exact: true }).click();
-    const reviewerDebit = reviewer.getByText(bankRef, { exact: false }).first().locator('xpath=ancestor::div[contains(@class,"listEntry")][1]');
-    await reviewerDebit.getByRole('button', { name: 'Approve debit', exact: true }).click();
-    await expect(reviewerDebit).toContainText('approved');
-    await reviewer.getByRole('tab', { name: 'Claim closeout', exact: true }).click();
-    await reviewer.getByRole('combobox', { name: 'Exact approved bank debit', exact: true }).first().selectOption({ label: `${bankRef} · ₦902,500.00` });
-    await reviewer.getByRole('button', { name: 'Confirm payment', exact: true }).click();
-    await expect(reviewer.getByText(`Bank debit ${bankRef}`, { exact: true })).toBeVisible();
+    await director.getByRole('tab', { name: 'Claim closeout', exact: true }).click();
+    await expect(director.getByRole('tabpanel', { name: 'Claim closeout', exact: true })).toContainText('net certified ₦902,500.00');
+    await expect(director.getByRole('tabpanel', { name: 'Claim closeout', exact: true })).toContainText('approved');
+    await expect(director.getByRole('button', { name: 'Confirm payment', exact: true })).toHaveCount(0);
 
     await page.goto('/construction/operations');
     await page.waitForLoadState('networkidle');

@@ -6,9 +6,7 @@ import { createDemoWorkspaceState } from '@/server/data/demo-state';
 import { runWithRecordContext, type WorkspaceRecordState } from '@/server/data/record-context';
 import { financeControl } from '@/server/finance-control';
 import {
-  approveConstructionHandoverPack, assessConstructionClaim, confirmConstructionClaimPayment,
-  confirmConstructionRetentionPayment, decideConstructionClaim, decideConstructionRetentionRelease,
-  importConstructionBankDebits, requestConstructionRetentionRelease, reviewConstructionBankDebit,
+  approveConstructionHandoverPack, assessConstructionClaim, decideConstructionClaim, requestConstructionRetentionRelease,
   saveConstructionHandoverPack, submitConstructionClaim, submitConstructionHandoverPack,
 } from '@/server/actions/construction-control';
 import { issueWhtCertificate } from '@/server/actions/finance-control';
@@ -59,7 +57,7 @@ describe('Construction handover and claim closeout', () => {
     expect(control().handoverPacks[0].status).toBe('approved');
   });
 
-  it('requires reviewed exact bank debits, prevents reuse, and records a separate retained liability and WHT proof', async () => {
+  it('keeps certified claims as liabilities without an unverified payment confirmation', async () => {
     const projectId = projects()[0].id;
     const subcontractor = (state.collections.constructionSubcontractors as { id: string; projectIds: string[] }[]).find((row) => row.projectIds.includes(projectId))!;
     const created = await run(() => submitConstructionClaim({ projectId, subcontractorId: subcontractor.id, periodEndISO: '2026-10-25', description: 'Measured reinforced concrete work', claimedNaira: 1000, retentionPct: 5, whtPct: 5 }));
@@ -69,37 +67,18 @@ describe('Construction handover and claim closeout', () => {
     expect((await run(() => assessConstructionClaim(claim.id, 1000))).ok).toBe(true);
     as('director-1', 'project-director');
     expect((await run(() => decideConstructionClaim(claim.id, 'approved'))).ok).toBe(true);
-    as('finance-importer', 'construction-finance');
-    expect((await run(() => importConstructionBankDebits(`date,reference,amount,direction,narration\n2026-10-26,BANK-IPC-001,${claim.certifiedMinor},debit,IPC payment\n2026-10-27,BANK-RET-001,${claim.retentionMinor},debit,Retention release`))).ok).toBe(true);
-    const [retentionLine, claimLine] = control().bankDebits;
-    expect((await run(() => confirmConstructionClaimPayment(claim.id, claimLine.id))).ok).toBe(false);
-    expect((await run(() => reviewConstructionBankDebit(claimLine.id, 'approved'))).ok).toBe(false);
-    as('finance-reviewer', 'construction-finance');
-    expect((await run(() => reviewConstructionBankDebit(claimLine.id, 'approved'))).ok).toBe(true);
-    expect((await run(() => reviewConstructionBankDebit(retentionLine.id, 'approved'))).ok).toBe(true);
-    expect((await run(() => confirmConstructionClaimPayment(claim.id, retentionLine.id))).ok).toBe(false);
-    expect((await run(() => confirmConstructionClaimPayment(claim.id, claimLine.id))).ok).toBe(true);
-    expect(claim).toMatchObject({ status: 'paid', paymentReference: 'BANK-IPC-001' });
-    const release = await run(() => requestConstructionRetentionRelease(claim.id, 50, 'Defects period complete'));
-    expect(release.ok).toBe(true); if (!release.ok) return;
-    expect((await run(() => requestConstructionRetentionRelease(claim.id, 1, 'Extra release'))).ok).toBe(false);
-    expect((await run(() => decideConstructionRetentionRelease(release.id!, 'approved'))).ok).toBe(false);
-    as('director-2', 'project-director');
-    expect((await run(() => decideConstructionRetentionRelease(release.id!, 'approved'))).ok).toBe(true);
-    as('finance-reviewer', 'construction-finance');
-    expect((await run(() => confirmConstructionRetentionPayment(release.id!, claimLine.id))).ok).toBe(false);
-    expect((await run(() => confirmConstructionRetentionPayment(release.id!, retentionLine.id))).ok).toBe(true);
-    expect(control().retentionReleases[0].status).toBe('paid');
-    expect((await run(() => issueWhtCertificate('construction_claim', claim.id, '2026-10-01'))).ok).toBe(false);
-    expect((await run(() => issueWhtCertificate('construction_claim', claim.id, '2026-10-01', { externalCertificateRef: 'FIRS-IPC-001', remittanceRef: 'REMIT-IPC-001' }))).ok).toBe(true);
-    expect(run(() => financeControl(tenant)).whtCertificates[0]).toMatchObject({ sourceId: claim.id, externalCertificateRef: 'FIRS-IPC-001', remittanceRef: 'REMIT-IPC-001' });
-    expect((await run(() => issueWhtCertificate('construction_claim', claim.id, '2026-10-01', { externalCertificateRef: 'FIRS-IPC-002', remittanceRef: 'REMIT-IPC-002' }))).ok).toBe(false);
+    expect(claim.status).toBe('approved');
+    expect(claim.certifiedMinor).toBe(90_250);
+    expect(claim.paymentReference).toBeUndefined();
+    expect(control().bankDebits).toHaveLength(0);
+    expect((await run(() => requestConstructionRetentionRelease(claim.id, 50, 'Defects period complete'))).ok).toBe(false);
+    expect((await run(() => issueWhtCertificate('construction_claim', claim.id, '2026-10-01', { externalCertificateRef: 'FIRS-IPC-001', remittanceRef: 'REMIT-IPC-001' }))).ok).toBe(false);
+    expect(run(() => financeControl(tenant)).whtCertificates).toHaveLength(0);
   });
 
   it('rejects actions on a different project and company', async () => {
     const otherProject = projects()[1].id;
     expect((await run(() => saveConstructionHandoverPack({ projectId: otherProject, title: 'Other project handover', items: [] }))).ok).toBe(false);
-    expect((await run(() => importConstructionBankDebits('date,reference,amount,direction\n2026-10-26,BANK-FOREIGN,100,debit'))).ok).toBe(false);
     as('foreign-director', 'project-director', [projects()[0].id], 'b8e62128-130e-4975-b3be-48d45ca7d9a3');
     expect((await run(() => saveConstructionHandoverPack({ projectId: projects()[0].id, title: 'Foreign company pack', items: [] }))).ok).toBe(false);
   });
