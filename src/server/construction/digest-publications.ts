@@ -17,9 +17,11 @@ import { getActor } from '@/server/session';
 import { nativeAuthEnabled } from '@/server/auth/mode';
 import { isDemoAccount } from '@/server/auth/demo-config';
 import { operatingClock, operatingNowISO } from '@/server/operating-clock';
+import { signDigestReceiptClaim, verifyDigestReceiptClaim } from './digest-receipt-tokens';
 
 export type DigestDelivery = { email: string; status: 'pending' | 'sending' | 'accepted' | 'delayed' | 'delivered' | 'bounced' | 'failed' | 'simulated';
-  attempts: number; providerEmailId?: string; previousProviderEmailIds?: string[]; lastAttemptISO?: string; deliveredISO?: string; error?: string; eventIds?: string[] };
+  attempts: number; providerEmailId?: string; previousProviderEmailIds?: string[]; lastAttemptISO?: string; deliveredISO?: string; error?: string; eventIds?: string[];
+  acknowledgedISO?: string; acknowledgedBy?: string; acknowledgedOrganisation?: string };
 export type DigestPublication = { id: string; tenantId: string; projectId: string; projectName: string; weekOfISO: string;
   sourceSha256: string; sections: DigestSection[]; coverageGaps: string[]; approvedByUserId: string; approvedByName: string;
   approvedAtISO: string; requestKey: string; recipients: DigestDelivery[]; simulated: boolean };
@@ -147,12 +149,17 @@ async function dispatchDigestRecipient(publicationId: string, email: string): Pr
     if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM || !process.env.RESEND_WEBHOOK_SECRET) throw new Error('provider_not_configured');
     const origin = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? process.env.BETTER_AUTH_URL ?? '');
     if (origin.protocol !== 'https:') throw new Error('Public application URL is not configured.');
+    const receipt = new URL('/construction/digest/acknowledge', origin);
+    const expiresISO = new Date(Date.parse(publication.approvedAtISO) + 30 * 86400000).toISOString();
+    receipt.searchParams.set('token', signDigestReceiptClaim({ tenantId: publication.tenantId, publicationId: publication.id,
+      emailHash: createHash('sha256').update(email).digest('hex'), expiresISO }));
     const body = [`${publication.projectName} · construction weekly digest · ${publication.weekOfISO}`,
       `Approved by ${publication.approvedByName} on ${publication.approvedAtISO}.`,
       `Source SHA-256: ${publication.sourceSha256}`,
       ...publication.sections.map((section) => `${section.title}\n${section.text}\nSources: ${section.sources.map((source) => `${source.label} — ${new URL(source.href, origin).toString()}`).join(', ') || 'None supplied'}`),
       `Missing approved-report dates: ${publication.coverageGaps.join(', ') || 'None'}`,
-      'This is a reviewed project summary. Rule-match scores are not independent verification.'].join('\n\n');
+      `Acknowledge receipt at ${receipt.toString()}`,
+      'This receipt confirms delivery to you, not technical approval. The link expires in 30 days. Rule-match scores are not independent verification.'].join('\n\n');
     const sent = await sendEmail({ to: email, purpose: `Propbrew weekly construction digest · ${publication.projectName} · ${publication.weekOfISO}`,
       body, tags: [{ name: 'propbrew_tenant', value: publication.tenantId }, { name: 'propbrew_digest', value: publication.id }],
       idempotencyKey: `propbrew-digest-${publication.id}-${createHash('sha256').update(email).digest('hex').slice(0, 12)}-${attempt}` });
@@ -180,6 +187,48 @@ async function dispatchDigestRecipient(publicationId: string, email: string): Pr
       audit(row.tenantId, row.projectId, actor.userId, row.approvedByName, `Digest email failed for ${email}`, row.id);
     }, 'construction', 'update');
   }
+}
+
+function receiptRecipient(rows: DigestPublication[] | undefined, claim: NonNullable<ReturnType<typeof verifyDigestReceiptClaim>>) {
+  const row = rows?.find((item) => item.id === claim.publicationId && item.tenantId === claim.tenantId &&
+    new Date(Date.parse(item.approvedAtISO) + 30 * 86400000).toISOString() === claim.expiresISO && !item.simulated);
+  const recipient = row?.recipients.find((item) => createHash('sha256').update(item.email).digest('hex') === claim.emailHash &&
+    ['accepted', 'delivered'].includes(item.status));
+  return { row, recipient };
+}
+
+export async function publicDigestReceipt(token: string): Promise<{ projectName: string; weekOfISO: string; sourceSha256: string; acknowledgedISO?: string } | null> {
+  const claim = verifyDigestReceiptClaim(token);
+  if (!claim) return null;
+  return withWorkspaceState(claim.tenantId, claim.tenantId, 'read', () => { throw new Error('Workspace unavailable.'); }, async (payload) => {
+    const state = validateWorkspaceRecordState(payload, claim.tenantId);
+    const { row, recipient } = receiptRecipient(state.auxiliary.constructionDigestPublications as DigestPublication[] | undefined, claim);
+    return { value: row && recipient ? { projectName: row.projectName, weekOfISO: row.weekOfISO,
+      sourceSha256: row.sourceSha256, acknowledgedISO: recipient.acknowledgedISO } : null, payload: state, commit: false };
+  });
+}
+
+export async function acknowledgePublicDigestReceipt(token: string, input: unknown): Promise<{ ok: boolean; error?: string }> {
+  const claim = verifyDigestReceiptClaim(token);
+  if (!claim) return { ok: false, error: 'This receipt link is invalid or expired.' };
+  const parsed = z.object({ name: z.string().trim().min(2).max(120), organisation: z.string().trim().min(2).max(120),
+    confirmed: z.literal('yes') }).strict().safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'Enter your name and organisation, then confirm receipt.' };
+  return withWorkspaceState<{ ok: boolean; error?: string }>(claim.tenantId, claim.tenantId, 'write', () => { throw new Error('Workspace unavailable.'); }, async (payload) => {
+    const state = validateWorkspaceRecordState(payload, claim.tenantId);
+    const { row, recipient } = receiptRecipient(state.auxiliary.constructionDigestPublications as DigestPublication[] | undefined, claim);
+    if (!row || !recipient) return { value: { ok: false, error: 'This publication is unavailable.' }, payload: state, commit: false };
+    if (recipient.acknowledgedISO) return { value: { ok: true }, payload: state, commit: false };
+    recipient.acknowledgedISO = operatingNowISO();
+    recipient.acknowledgedBy = parsed.data.name;
+    recipient.acknowledgedOrganisation = parsed.data.organisation;
+    const audits = state.collections.constructionAudit as AuditEntry[];
+    audits.push({ tenantId: claim.tenantId as AuditEntry['tenantId'], id: `au-digest-${randomUUID()}`, seq: audits.length + 1,
+      atISO: recipient.acknowledgedISO, actorId: `external:${row.id}`, actorName: parsed.data.name, actorRole: 'external_recipient',
+      action: 'record', entity: 'construction_digest', entityRef: row.id, projectId: row.projectId,
+      summary: `External recipient acknowledged weekly digest ${row.weekOfISO}` });
+    return { value: { ok: true }, payload: state };
+  });
 }
 
 export type ResendDigestEvent = { id: string; type: string; created_at: string; data: { email_id?: string; to?: string[]; tags?: Record<string, string> | { name: string; value: string }[] } };

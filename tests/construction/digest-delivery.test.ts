@@ -10,15 +10,17 @@ vi.mock('@/server/data/workspace-postgres', () => ({ withWorkspaceState: async (
   return result.value;
 } }));
 
-import { digestPublications, digestSourceSha256, recordDigestDeliveryEvent, reportingWeekOfISO, type DigestPublication } from '@/server/construction/digest-publications';
+import { acknowledgePublicDigestReceipt, digestPublications, digestSourceSha256, publicDigestReceipt, recordDigestDeliveryEvent, reportingWeekOfISO, type DigestPublication } from '@/server/construction/digest-publications';
 import { recordTransmittalDeliveryEvent } from '@/server/construction/transmittal-delivery';
+import { createHash } from 'node:crypto';
+import { signDigestReceiptClaim, verifyDigestReceiptClaim } from '@/server/construction/digest-receipt-tokens';
 
 const tenant = '11111111-1111-4111-8111-111111111111';
 const publicationId = '22222222-2222-4222-8222-222222222222';
 const emailId = '33333333-3333-4333-8333-333333333333';
 const at = '2026-11-02T09:00:00.000Z';
 
-beforeEach(() => { boundary.state = initialWorkspaceRecordState(tenant); });
+beforeEach(() => { boundary.state = initialWorkspaceRecordState(tenant); process.env.CONSTRUCTION_TRANSMITTAL_SECRET = 'test-secret-for-digest-receipts-at-least-32-characters'; });
 
 describe('Construction digest and transmittal delivery records', () => {
   it('persists an approved digest snapshot across a state reload and changes its fingerprint when sources change', () => {
@@ -49,6 +51,31 @@ describe('Construction digest and transmittal delivery records', () => {
     expect(row.recipients[0].eventIds).toEqual(['evt-1']);
     expect((boundary.state!.collections.constructionAudit as unknown[])).toHaveLength(1);
     expect(await recordDigestDeliveryEvent({ ...event, id: 'evt-2', data: { ...event.data, tags: { ...event.data.tags, propbrew_digest: '99999999-9999-4999-8999-999999999999' } } })).toBe(false);
+  });
+
+  it('accepts one recipient-bound digest receipt and saves its audit after reload', async () => {
+    const state = boundary.state!;
+    state.auxiliary.constructionDigestPublications = [{ id: publicationId, tenantId: tenant, projectId: 'project-1', projectName: 'Project 1', weekOfISO: '2026-11-02',
+      sourceSha256: 'a'.repeat(64), sections: [], coverageGaps: [], approvedByUserId: 'manager', approvedByName: 'Manager',
+      approvedAtISO: at, requestKey: publicationId, simulated: false,
+      recipients: [{ email: 'pilot@example.com', status: 'delivered', attempts: 1, providerEmailId: emailId }] }] satisfies DigestPublication[];
+    const expiresISO = new Date(Date.parse(at) + 30 * 86400000).toISOString();
+    const token = signDigestReceiptClaim({ tenantId: tenant, publicationId, emailHash: createHash('sha256').update('pilot@example.com').digest('hex'), expiresISO });
+    expect(verifyDigestReceiptClaim(token)).not.toBeNull();
+    expect(verifyDigestReceiptClaim(token + 'x')).toBeNull();
+    expect(verifyDigestReceiptClaim(token, Date.parse(expiresISO))).toBeNull();
+    const otherRecipientToken = signDigestReceiptClaim({ tenantId: tenant, publicationId,
+      emailHash: createHash('sha256').update('another@example.com').digest('hex'), expiresISO });
+    expect(await publicDigestReceipt(otherRecipientToken)).toBeNull();
+    expect(await acknowledgePublicDigestReceipt(otherRecipientToken, { name: 'Other Recipient', organisation: 'Elsewhere', confirmed: 'yes' })).toMatchObject({ ok: false });
+    expect(await publicDigestReceipt(token)).toMatchObject({ projectName: 'Project 1', weekOfISO: '2026-11-02' });
+    expect(await acknowledgePublicDigestReceipt(token, { name: 'Pilot Operator', organisation: 'Propbrew QA', confirmed: 'yes' })).toEqual({ ok: true });
+    expect(await acknowledgePublicDigestReceipt(token, { name: 'Pilot Operator', organisation: 'Propbrew QA', confirmed: 'yes' })).toEqual({ ok: true });
+    const reloaded = JSON.parse(JSON.stringify(boundary.state)) as WorkspaceRecordState;
+    expect((reloaded.auxiliary.constructionDigestPublications as DigestPublication[])[0].recipients[0]).toMatchObject({
+      acknowledgedBy: 'Pilot Operator', acknowledgedOrganisation: 'Propbrew QA', status: 'delivered' });
+    expect(reloaded.collections.constructionAudit).toHaveLength(1);
+    expect(await acknowledgePublicDigestReceipt(token.slice(0, -1) + 'x', { name: 'Other', organisation: 'Elsewhere', confirmed: 'yes' })).toMatchObject({ ok: false });
   });
 
   it('accepts a valid tenant UUID in a transmittal callback and records a bounce', async () => {

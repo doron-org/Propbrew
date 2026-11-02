@@ -15,7 +15,7 @@ import { nativeApiRouteAllowed } from '@/server/auth/native-api-routes';
  * This file does nothing but keep unauthenticated deep-links tidy once real auth
  * lands; today, with the dev identity always present, it is a pass-through.
  */
-const isPublic = createRouteMatcher(['/', '/login(.*)', '/sign-up(.*)', '/api/v1/health', '/api/webhooks(.*)', '/api/construction/transmittals/acknowledge', '/construction/transmittals/acknowledge', '/robots.txt', '/sitemap.xml']);
+const isPublic = createRouteMatcher(['/', '/login(.*)', '/sign-up(.*)', '/api/v1/health', '/api/webhooks(.*)', '/api/construction/transmittals/acknowledge', '/construction/transmittals/acknowledge', '/api/construction/digest/acknowledge', '/construction/digest/acknowledge', '/robots.txt', '/sitemap.xml']);
 const clerkProxy = clerkMiddleware(async (auth, request) => {
   if (!isPublic(request)) await auth.protect();
 });
@@ -50,7 +50,7 @@ export function proxy(request: NextRequest, event: Parameters<typeof clerkProxy>
       if (nativeApiRouteAllowed(pathname)) return NextResponse.next();
       return new NextResponse('Not found',{status:404,headers:{'Cache-Control':'no-store'}});
     }
-    const publicPage=pathname==='/'||pathname==='/mobile'||pathname==='/login'||pathname.startsWith('/login/')||pathname==='/sign-up'||pathname.startsWith('/sign-up/')||pathname.startsWith('/invite/')||pathname==='/construction/transmittals/acknowledge'||pathname==='/robots.txt'||pathname==='/sitemap.xml';
+    const publicPage=pathname==='/'||pathname==='/mobile'||pathname==='/login'||pathname.startsWith('/login/')||pathname==='/sign-up'||pathname.startsWith('/sign-up/')||pathname.startsWith('/invite/')||pathname==='/construction/transmittals/acknowledge'||pathname==='/construction/digest/acknowledge'||pathname==='/robots.txt'||pathname==='/sitemap.xml';
     if(!publicPage&&!getSessionCookie(request,{cookiePrefix:'propbrew'}))return NextResponse.redirect(new URL('/login',request.url));
     return NextResponse.next();
   }

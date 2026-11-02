@@ -28,6 +28,7 @@ export function nativeApiRouteAllowed(pathname: string): boolean {
     || pathname === '/api/construction/models/revisions'
     || pathname === '/api/construction/transmittals'
     || pathname === '/api/construction/transmittals/acknowledge'
+    || pathname === '/api/construction/digest/acknowledge'
     || /^\/api\/construction\/transmittals\/tr-new-[1-9][0-9]{0,12}\/retry$/.test(pathname)
     || pathname === '/api/construction/reports/export'
     || pathname === '/api/webhooks/resend'

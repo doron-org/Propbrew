@@ -8,6 +8,7 @@ describe('native API proxy allowlist', () => {
     expect(nativeApiRouteAllowed('/api/construction/handover/chp-00000000-0000-4000-8000-000000000000')).toBe(true);
     expect(nativeApiRouteAllowed('/api/construction/transmittals')).toBe(true);
     expect(nativeApiRouteAllowed('/api/construction/transmittals/acknowledge')).toBe(true);
+    expect(nativeApiRouteAllowed('/api/construction/digest/acknowledge')).toBe(true);
     expect(nativeApiRouteAllowed('/api/construction/transmittals/tr-new-42/retry')).toBe(true);
     expect(nativeApiRouteAllowed('/api/construction/reports/export')).toBe(true);
     expect(nativeApiRouteAllowed('/api/mobile/v1/construction/bootstrap')).toBe(true);
