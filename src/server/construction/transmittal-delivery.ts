@@ -193,7 +193,7 @@ export async function recordTransmittalDeliveryEvent(event: ResendTransmittalEve
   const tags = Array.isArray(event.data.tags) ? Object.fromEntries(event.data.tags.map((tag) => [tag.name, tag.value])) : event.data.tags ?? {};
   const tenantId = tags.propbrew_tenant, id = tags.propbrew_transmittal;
   if (!tenantId || !uuid.test(tenantId) || !/^tr-new-[1-9][0-9]{0,12}$/.test(id ?? '') || !event.data.email_id || !event.id || !Number.isFinite(Date.parse(event.created_at))) return false;
-  const states: Record<string, Transmittal['deliveryStatus']> = { 'email.delivered': 'delivered', 'email.delivery_delayed': 'delayed', 'email.bounced': 'bounced', 'email.complained': 'bounced', 'email.suppressed': 'bounced' };
+  const states: Record<string, Transmittal['deliveryStatus']> = { 'email.delivered': 'delivered', 'email.delivery_delayed': 'delayed', 'email.bounced': 'bounced', 'email.complained': 'bounced', 'email.suppressed': 'bounced', 'email.failed': 'failed' };
   const next = states[event.type]; if (!next) return false;
   return publicWorkspace(tenantId, 'write', (rows, _projects, audits) => {
     const row = rows.find((item) => item.id === id && item.tenantId === tenantId && item.recipientEmail &&

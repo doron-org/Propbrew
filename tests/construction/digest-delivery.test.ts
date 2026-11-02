@@ -60,4 +60,22 @@ describe('Construction digest and transmittal delivery records', () => {
       data: { email_id: emailId, to: ['bounced@resend.dev'], tags: { propbrew_tenant: tenant, propbrew_transmittal: 'tr-new-1' } } })).toBe(true);
     expect((boundary.state!.collections.constructionTransmittals as { deliveryStatus: string }[]).at(-1)?.deliveryStatus).toBe('bounced');
   });
+
+  it('records a failed provider event for a matching digest and transmittal', async () => {
+    const state = boundary.state!;
+    state.auxiliary.constructionDigestPublications = [{ id: publicationId, tenantId: tenant, projectId: 'project-1', projectName: 'Project 1', weekOfISO: '2026-11-02',
+      sourceSha256: 'a'.repeat(64), sections: [], coverageGaps: [], approvedByUserId: 'manager', approvedByName: 'Manager',
+      approvedAtISO: at, requestKey: publicationId, simulated: false,
+      recipients: [{ email: 'failed@resend.dev', status: 'accepted', attempts: 1, providerEmailId: emailId }] }] satisfies DigestPublication[];
+    expect(await recordDigestDeliveryEvent({ id: 'evt-failed-digest', type: 'email.failed', created_at: at,
+      data: { email_id: emailId, to: ['failed@resend.dev'], tags: { propbrew_tenant: tenant, propbrew_digest: publicationId } } })).toBe(true);
+    expect((boundary.state!.auxiliary.constructionDigestPublications as DigestPublication[])[0].recipients[0].status).toBe('failed');
+
+    (boundary.state!.collections.constructionTransmittals as Record<string, unknown>[]).push({ tenantId: tenant, id: 'tr-new-2', projectId: 'project-1',
+      docId: 'doc-2', docNumber: 'D-2', revision: 'A', toParty: 'Consultant', recipientEmail: 'failed@resend.dev',
+      sentISO: at, purpose: 'for_review', deliveryStatus: 'accepted', providerEmailId: emailId });
+    expect(await recordTransmittalDeliveryEvent({ id: 'evt-failed-transmittal', type: 'email.failed', created_at: at,
+      data: { email_id: emailId, to: ['failed@resend.dev'], tags: { propbrew_tenant: tenant, propbrew_transmittal: 'tr-new-2' } } })).toBe(true);
+    expect((boundary.state!.collections.constructionTransmittals as { deliveryStatus: string }[]).at(-1)?.deliveryStatus).toBe('failed');
+  });
 });

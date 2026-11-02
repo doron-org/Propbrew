@@ -188,7 +188,7 @@ export async function recordDigestDeliveryEvent(event: ResendDigestEvent): Promi
   const tenantId = tags.propbrew_tenant, publicationId = tags.propbrew_digest;
   if (!tenantId || !tenantUuid.test(tenantId) || !publicationId || !tenantUuid.test(publicationId) || !event.id || !event.data.email_id || !Number.isFinite(Date.parse(event.created_at))) return false;
   const states: Record<string, DigestDelivery['status']> = { 'email.delivered': 'delivered', 'email.delivery_delayed': 'delayed',
-    'email.bounced': 'bounced', 'email.complained': 'bounced', 'email.suppressed': 'bounced' };
+    'email.bounced': 'bounced', 'email.complained': 'bounced', 'email.suppressed': 'bounced', 'email.failed': 'failed' };
   const next = states[event.type];
   if (!next) return false;
   return withWorkspaceState(tenantId, tenantId, 'write', () => { throw new Error('Workspace unavailable.'); }, async (payload) => {
