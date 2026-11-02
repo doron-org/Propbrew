@@ -1,10 +1,16 @@
 # Construction project acceptance journey
 
+## Verification · 2 November 2026
+
+The disposable company-authenticated browser journey passed after the drawing disclosure, claim assessment and tab-selection steps were aligned with the current UI. It now approves the baseline and activates the project before site work, then verifies field evidence, controlled files, independent consultant handover sign-off, signed-pack ZIP hashes and cross-company download denial. The latest run completed with **1 passed**. The route warm-up and extended timeout apply only to first-request compilation in the local development server; they do not skip the external-issue or access-control assertions.
+
+The live Construction demo was checked in the client, consultant, subcontractor and field-worker views. Those views open, but switching demo user type retains one underlying account identity. Its sample projects currently have no approved uploaded handover documents or signed pack. Demo role switching is useful for UI review; independent sign-off and a real physical handover require distinct named accounts, genuine project files and decisions by the actual reviewers. No real site acceptance is claimed from this test.
+
 ## Repeatable browser run
 
 Run `node scripts/test-company-auth-e2e.mjs tests/e2e-company-auth/construction-acceptance.e2e.ts` from the repository root. The runner creates a disposable PostgreSQL server, applies current migrations, starts a local company-authenticated app, and removes its database and app copy afterward. It never uses customer records or provider credentials.
 
-The browser journey creates a Lagos project and a second project for isolation. It mobilises the first with a WBS phase, task, NGN cost package and independently approved programme baseline; onboards and approves a Nigerian subcontractor; and signs in separate director, client, consultant, subcontractor, field-worker and quantity-surveyor accounts. The field worker records 25% task progress and receives a synced server receipt. Each project-scoped role sees the assigned project but not the second project. A separately signed-up company cannot open either the project or its private drawing PDF.
+The browser journey creates a Lagos project and a second project for isolation. It mobilises the first with a WBS phase, task, NGN cost package and independently approved programme baseline, then activates it before site delivery; onboards and approves a Nigerian subcontractor; and signs in separate director, client, consultant, subcontractor, field-worker and quantity-surveyor accounts. The field worker records 25% task progress and receives a synced server receipt. Each project-scoped role sees the assigned project but not the second project. A separately signed-up company cannot open either the project or its private drawing PDF.
 
 The commercial leg submits a ₦1,000,000 claim, assesses it as QS and certifies it as director. The ₦902,500 net amount remains an approved liability after 5% retention and 5% WHT on the post-retention value. Construction no longer imports statements or confirms payment from bank records.
 

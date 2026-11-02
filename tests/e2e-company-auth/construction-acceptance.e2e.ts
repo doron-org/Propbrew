@@ -11,6 +11,18 @@ const passphrase = 'Disposable construction acceptance passphrase 2026!';
 const future = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 test.use({ actionTimeout: 10_000 });
 
+async function openDocumentRevisions(page: Page, number: string) {
+  const record = page.getByRole('region', { name: `${number} document record`, exact: true });
+  const disclosure = record.getByRole('button', { name: new RegExp(number) });
+  const revisions = record.getByRole('region', { name: `Revisions for ${number}`, exact: true });
+  await expect(record).toBeVisible();
+  await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+  await disclosure.click();
+  await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+  await expect(revisions).toBeVisible();
+  return record;
+}
+
 async function uploadApprovedHandoverFile(page: Page, projectId: string, number: string, title: string, pdfBytes: Buffer) {
   await page.goto(`/construction/documents?projectId=${projectId}`);
   const dialog = page.getByRole('dialog', { name: 'Upload a controlled document', exact: true });
@@ -21,10 +33,8 @@ async function uploadApprovedHandoverFile(page: Page, projectId: string, number:
   await dialog.getByLabel('Controlled PDF', { exact: true }).setInputFiles({ name: `${number}.pdf`, mimeType: 'application/pdf', buffer: pdfBytes });
   await dialog.getByRole('button', { name: 'Save controlled PDF', exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  const record = page.getByRole('region', { name: `${number} document record`, exact: true });
-  await expect(record).toBeVisible();
-  const disclosure = record.getByRole('button', { name: new RegExp(number) });
-  if (await disclosure.getAttribute('aria-expanded') === 'false') await disclosure.click();
+  await page.reload();
+  const record = await openDocumentRevisions(page, number);
   await record.getByRole('button', { name: 'Approve', exact: true }).click();
   const confirmation = page.getByRole('dialog', { name: 'Review construction change', exact: true });
   await confirmation.getByRole('button', { name: 'Confirm change', exact: true }).click();
@@ -93,12 +103,15 @@ async function inviteRole(owner: Page, browser: Browser, id: string, profile: st
   return { context, member };
 }
 
-test('a saved Lagos project mobilises, isolates roles and certifies a claim', async ({ page, browser }) => {
+test('a Lagos project mobilises, isolates roles and reaches signed handover', async ({ page, browser }) => {
   test.setTimeout(720_000);
   const id = randomUUID().slice(0, 8);
   const firstName = `Lekki acceptance build ${id}`;
   const secondName = `Abuja isolation build ${id}`;
   await createCompany(page, id);
+  // Compile the external-issue route before opening a modal whose submit state
+  // would otherwise wait on Next's first-request development compilation.
+  expect((await page.request.get('/api/construction/transmittals')).status()).toBe(405);
   const firstId = await createProject(page, firstName);
   const secondId = await createProject(page, secondName);
   expect(firstId).not.toBe(secondId);
@@ -157,6 +170,10 @@ test('a saved Lagos project mobilises, isolates roles and certifies a claim', as
     await director.goto(`/construction/projects/${firstId}/setup?section=baselines`);
     await director.getByRole('button', { name: 'Approve', exact: true }).click();
     await expect(director.getByText('Approved', { exact: true })).toBeVisible();
+    await page.goto(`/construction/projects/${firstId}/setup?section=lifecycle`);
+    await page.getByLabel('Reason for transition', { exact: true }).fill('Programme baseline approved; project and contract team mobilised');
+    await page.getByRole('button', { name: 'Activate', exact: true }).click();
+    await expect(page.getByText('Active', { exact: true }).first()).toBeVisible();
     for (const [profile, label, assignment] of [
       ['client-investor', 'Assigned construction projects', firstName],
       ['consultant-approver', 'Assigned construction projects', firstName],
@@ -183,19 +200,19 @@ test('a saved Lagos project mobilises, isolates roles and certifies a claim', as
     await field.goto('/construction/portal/field');
     await expect(field.getByRole('heading', { name: /Today’s assigned work/ })).toBeVisible();
     await field.goto('/construction/field');
-    await field.getByRole('tab', { name: 'Task progress', exact: true }).click();
+    await selectTab(field.getByRole('tab', { name: 'Task progress', exact: true }), field.getByRole('tabpanel', { name: 'Task progress', exact: true }));
     await expect(field.getByRole('combobox', { name: 'Task', exact: true })).toContainText('Establish fenced site');
     const progress = field.getByRole('slider', { name: 'Percent complete', exact: true });
     await progress.focus();
     for (let step = 0; step < 5; step++) await progress.press('ArrowRight');
     await expect(progress).toHaveValue('25');
     await field.getByRole('button', { name: 'Record progress', exact: true }).click();
-    await field.getByRole('tab', { name: 'Device outbox', exact: false }).click();
+    await selectTab(field.getByRole('tab', { name: 'Device outbox', exact: false }), field.getByRole('tabpanel', { name: 'Device outbox', exact: false }));
     await expect(field.getByRole('region', { name: /Establish fenced site → 25% outbox record/ })).toContainText('synced', { timeout: 30_000 });
 
     await page.goto('/construction/operations');
     await page.waitForLoadState('networkidle');
-    await page.getByRole('tab', { name: 'Changes & claims', exact: true }).click();
+    await selectTab(page.getByRole('tab', { name: 'Changes & claims', exact: true }), page.getByRole('tabpanel', { name: 'Changes & claims', exact: true }));
     const claimsTab = page.getByRole('tabpanel', { name: 'Changes & claims', exact: true });
     await page.getByRole('combobox', { name: 'Project', exact: true }).selectOption({ label: firstName });
     await page.getByRole('combobox', { name: 'Approved subcontractor', exact: true }).selectOption({ label: `${subcontractorName} · Civil works` });
@@ -209,22 +226,22 @@ test('a saved Lagos project mobilises, isolates roles and certifies a claim', as
 
     const surveyor = memberships[5].member;
     await surveyor.goto('/construction/operations');
-    await surveyor.getByRole('tab', { name: 'Changes & claims', exact: true }).click();
-    await surveyor.getByRole('button', { name: 'Save QS assessment', exact: true }).click();
+    await selectTab(surveyor.getByRole('tab', { name: 'Changes & claims', exact: true }), surveyor.getByRole('tabpanel', { name: 'Changes & claims', exact: true }));
+    await surveyor.getByRole('row', { name: new RegExp(subcontractorName) }).last().getByRole('button', { name: 'Assess at claim value', exact: true }).click();
     await expect(surveyor.getByRole('row', { name: new RegExp(subcontractorName) }).last()).toContainText('Assessed');
     await director.goto('/construction/operations');
-    await director.getByRole('tab', { name: 'Changes & claims', exact: true }).click();
+    await selectTab(director.getByRole('tab', { name: 'Changes & claims', exact: true }), director.getByRole('tabpanel', { name: 'Changes & claims', exact: true }));
     await director.getByRole('row', { name: new RegExp(subcontractorName) }).last().getByRole('button', { name: 'Approve certificate', exact: true }).click();
     await expect(director.getByRole('row', { name: new RegExp(subcontractorName) }).last()).toContainText('Approved');
 
-    await director.getByRole('tab', { name: 'Claim closeout', exact: true }).click();
+    await selectTab(director.getByRole('tab', { name: 'Claim closeout', exact: true }), director.getByRole('tabpanel', { name: 'Claim closeout', exact: true }));
     await expect(director.getByRole('tabpanel', { name: 'Claim closeout', exact: true })).toContainText('net certified ₦902,500.00');
     await expect(director.getByRole('tabpanel', { name: 'Claim closeout', exact: true })).toContainText('approved');
     await expect(director.getByRole('button', { name: 'Confirm payment', exact: true })).toHaveCount(0);
 
     await page.goto('/construction/operations');
     await page.waitForLoadState('networkidle');
-    await page.getByRole('tab', { name: 'Handover packs', exact: true }).click();
+    await selectTab(page.getByRole('tab', { name: 'Handover packs', exact: true }), page.getByRole('tabpanel', { name: 'Handover packs', exact: true }));
     const handover = page.getByRole('tabpanel', { name: 'Handover packs', exact: true });
     await expect(handover).toBeVisible();
     await page.getByRole('combobox', { name: 'Project', exact: true }).selectOption({ label: firstName });
@@ -246,10 +263,8 @@ test('a saved Lagos project mobilises, isolates roles and certifies a claim', as
     await drawingDialog.getByLabel('Controlled PDF', { exact: true }).setInputFiles({ name: 'acceptance-drawing.pdf', mimeType: 'application/pdf', buffer: pdfBytes });
     await drawingDialog.getByRole('button', { name: 'Save controlled PDF', exact: true }).click();
     await expect(drawingDialog).not.toBeVisible();
-    const drawing = page.getByRole('region', { name: `${drawingNo} document record`, exact: true });
-    await expect(drawing).toBeVisible();
-    const disclosure = drawing.getByRole('button', { name: new RegExp(drawingNo) });
-    if (await disclosure.getAttribute('aria-expanded') === 'false') await disclosure.click();
+    await page.reload();
+    const drawing = await openDocumentRevisions(page, drawingNo);
     await drawing.getByRole('button', { name: 'Approve', exact: true }).click();
     const approvalDialog = page.getByRole('dialog', { name: 'Review construction change', exact: true });
     await expect(approvalDialog).toBeVisible();
@@ -262,7 +277,7 @@ test('a saved Lagos project mobilises, isolates roles and certifies a claim', as
     await issue.getByLabel('Recipient organisation', { exact: true }).fill('Acceptance client');
     await issue.getByLabel('Recipient email', { exact: true }).fill(`external-${id}@example.test`);
     await issue.getByRole('button', { name: 'Email controlled issue', exact: true }).click();
-    await expect(issue).not.toBeVisible();
+    await expect(issue).not.toBeVisible({ timeout: 90_000 });
     await expect(page.getByRole('region', { name: `${drawingNo} revision A` }).getByText('External email is not configured for this deployment.', { exact: false })).toBeVisible();
 
     const fileUrl = await page.getByRole('link', { name: 'Download PDF', exact: true }).getAttribute('href');
@@ -401,14 +416,12 @@ test('a saved Lagos project mobilises, isolates roles and certifies a claim', as
       await expect(otherCompany.getByRole('heading', { name: firstName, exact: true })).toHaveCount(0);
       const foreignFile = await otherCompany.request.get(fileUrl!);
       expect([401, 403, 404]).toContain(foreignFile.status());
-      const foreignPack = await otherCompany.request.get(archiveHref!);
+      const foreignPack = await otherCompany.request.get(archiveHref!, { timeout: 90_000 });
       expect([401, 403, 404]).toContain(foreignPack.status());
     } finally { await otherContext.close(); }
   } finally { await Promise.all(memberships.map((row) => row.context.close())); }
 
   await page.goto(`/construction/projects/${firstId}/setup?section=lifecycle`);
-  await page.getByLabel('Reason for transition', { exact: true }).fill('Site and contract team mobilised');
-  await page.getByRole('button', { name: 'Activate', exact: true }).click();
   await expect(page.getByText('Active', { exact: true }).first()).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: `${firstName} · project setup`, exact: true })).toBeVisible();
