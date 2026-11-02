@@ -115,6 +115,13 @@ describe('weekly digest', () => {
     expect(d.sections.every((s) => Array.isArray(s.sources))).toBe(true);
     expect(d.coverageGaps.length).toBeGreaterThan(0); // 07-25 report is only 'submitted', not approved
   });
+  it('does not claim missing reports before a newly started project existed', () => {
+    const project = { ...marina(), id: 'cp-pilot', status: 'active' as const, startISO: '2026-07-26' };
+    const pilotWorld = { ...world(), projects: [project], reports: [], pos: [] };
+    const digest = weeklyDigest(project, pilotWorld, NOW);
+    expect(digest.coverageGaps).toEqual([]);
+    expect(scanRisks(pilotWorld, NOW).some((risk) => risk.projectId === project.id && risk.kind === 'missing_report')).toBe(false);
+  });
 });
 
 describe('what-if simulator', () => {

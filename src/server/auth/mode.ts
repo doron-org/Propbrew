@@ -12,18 +12,3 @@ export function nativeRequestOriginAllowed(request: Request): boolean {
   } catch { return false; }
 }
 
-/** Public email receipt forms may omit Origin in embedded browsers. A matching
- * same-origin Referer and Fetch Metadata still bind the submission to our app. */
-export function nativePublicFormOriginAllowed(request: Request): boolean {
-  if (nativeRequestOriginAllowed(request)) return true;
-  const site = request.headers.get('Sec-Fetch-Site');
-  if (site && site !== 'same-origin') return false;
-  const referer = request.headers.get('Referer');
-  if (!referer) return false;
-  try {
-    const refererOrigin = new URL(referer).origin;
-    const canonical = new URL(process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? '').origin;
-    const allowed = [canonical, ...(process.env.PROPBREW_AUTH_ORIGINS ?? '').split(',').map((value) => value.trim()).filter(Boolean)];
-    return allowed.includes(refererOrigin);
-  } catch { return false; }
-}

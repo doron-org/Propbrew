@@ -1,9 +1,10 @@
-import { nativePublicFormOriginAllowed } from '@/server/auth/mode';
 import { acknowledgePublicTransmittal } from '@/server/construction/transmittal-delivery';
 
 export const runtime = 'nodejs';
 export async function POST(request: Request) {
-  if (!nativePublicFormOriginAllowed(request)) return new Response('Invalid origin.', { status: 403 });
+  // This public email form has no session authority. The expiring, HMAC-signed
+  // receipt token is its sole write credential; mail/embedded browsers may omit
+  // Origin and Referer even when the form is submitted from this app.
   if (!request.headers.get('content-type')?.startsWith('application/x-www-form-urlencoded')) return new Response('Invalid form.', { status: 415 });
   try {
     if (Number(request.headers.get('content-length') ?? 0) > 4096) return new Response('Form too large.', { status: 413 });

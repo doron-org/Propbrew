@@ -410,8 +410,10 @@ export function scanRisks(w: ConWorld, nowMs: number): RiskSignal[] {
     // 5. missing site report (active projects)
     if (ACTIVE.includes(p.status)) {
       const lastApproved = w.reports.filter((r) => r.projectId === p.id && r.status === 'approved').map((r) => Date.parse(r.dateISO)).sort((a, b) => b - a)[0];
-      const daysSince = lastApproved ? Math.round((nowMs - lastApproved) / DAY) : 99;
-      if (daysSince >= 2) out.push({ id: `rs-report-${p.id}`, kind: 'missing_report', projectId: p.id, projectName: p.name, severity: daysSince >= 4 ? 'danger' : 'warn', confidence: 0.9, title: `${p.name} — no approved site report in ${daysSince} days`, evidence: `Last approved daily report was ${daysSince} days ago.`, recommendation: 'Chase the site engineer to submit; review pending reports.', nairaAtRiskMinor: 0, href: '/construction/site' });
+      const startMs = Date.parse(p.startISO);
+      const sourceMs = lastApproved ?? (Number.isFinite(startMs) ? startMs : nowMs);
+      const daysSince = Math.max(0, Math.floor((nowMs - sourceMs) / DAY));
+      if (daysSince >= 2) out.push({ id: `rs-report-${p.id}`, kind: 'missing_report', projectId: p.id, projectName: p.name, severity: daysSince >= 4 ? 'danger' : 'warn', confidence: 0.9, title: `${p.name} — no approved site report in ${daysSince} days`, evidence: lastApproved ? `Last approved daily report was ${daysSince} days ago.` : `No approved daily report since the project started ${daysSince} days ago.`, recommendation: 'Chase the site engineer to submit; review pending reports.', nairaAtRiskMinor: 0, href: '/construction/site' });
     }
   }
   // 3. late procurement (open POs past their promised date)
@@ -549,14 +551,14 @@ export function weeklyDigest(p: Project, w: ConWorld, nowMs: number): { sections
     { title: 'Procurement', text: openPos.length ? `${openPos.length} open PO(s); ${w.pos.filter((po) => po.projectId === p.id && isOverdue(po.expectedISO, nowMs) && po.deliveredQty < po.qty).length} past their promised date.` : 'No open purchase orders.', confidence: 0.9, sources: openPos.slice(0, 2).map((po) => ({ label: po.ref, href: '/construction/procurement' })) },
     { title: 'Risks flagged', text: risks.length ? risks.slice(0, 3).map((r) => `${RISK_LABEL[r.kind]}: ${r.title}`).join(' · ') : 'No advisory risk signals this week.', confidence: 0.8, sources: [{ label: 'Risk Radar', href: '/construction/risk' }] },
   ];
-  return { sections, coverageGaps: coverageGaps(w.reports, p.id, nowMs, 7) };
+  return { sections, coverageGaps: coverageGaps(w.reports, p.id, nowMs, 7, p.startISO) };
 }
 
 /** Dates in the last `days` with no approved report for a project. */
-export function coverageGaps(reports: readonly DailyReport[], projectId: string, nowMs: number, days: number): string[] {
+export function coverageGaps(reports: readonly DailyReport[], projectId: string, nowMs: number, days: number, startISO?: string): string[] {
   const have = new Set(reports.filter((r) => r.projectId === projectId && r.status === 'approved').map((r) => r.dateISO));
   const gaps: string[] = [];
-  for (let i = 1; i <= days; i++) { const d = new Date(nowMs - i * DAY).toISOString().slice(0, 10); if (!have.has(d)) gaps.push(d); }
+  for (let i = 1; i <= days; i++) { const d = new Date(nowMs - i * DAY).toISOString().slice(0, 10); if ((!startISO || d >= startISO) && !have.has(d)) gaps.push(d); }
   return gaps;
 }
 
