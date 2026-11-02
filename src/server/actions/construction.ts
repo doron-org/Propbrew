@@ -42,6 +42,7 @@ import { pushNotification } from '@/server/data/inbox';
 import type { RFI, RFIActivity } from '@/domain/construction/types';
 import { CONSTRUCTION_PROJECT_TYPES, type ConstructionProjectType } from '@/domain/construction/forecast-evaluation';
 import { canRecordQualitySignOff } from '@/server/construction/quality-access';
+import { publishConstructionDigest, retryDigestRecipient } from '@/server/construction/digest-publications';
 
 export type Res = { ok: true; ref?: string } | { ok: false; error: string };
 
@@ -664,13 +665,16 @@ export async function clockWorker(workerId: string, projectId: string, present: 
 }
 
 /* --- digest --------------------------------------------------------------- */
-export async function publishDigest(projectId: string): Promise<Res> {
-  return withDurableMutation(async () => {
-  const g = await gate('update'); if (!g.ok) return g;
-  const p = scopedConstructionProjectGet(g.actor, projectId, 'update'); if (!p) return { ok: false, error: 'Project not found.' };
-  revalidate(); return { ok: true, ref: p.name };
+export async function publishDigest(input: { projectId: string; sourceSha256: string; requestKey: string; acknowledgeGaps: boolean; recipients: string[] }): Promise<Res> {
+  const result = await publishConstructionDigest(input);
+  if (result.ok) revalidate();
+  return result;
+}
 
-  }, 'construction');
+export async function retryPublishedDigestRecipient(publicationId: string, email: string): Promise<Res> {
+  const result = await retryDigestRecipient(publicationId, email);
+  if (result.ok) revalidate();
+  return result;
 }
 
 /* --- document revision control -------------------------------------------- */

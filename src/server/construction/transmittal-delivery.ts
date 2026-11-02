@@ -22,7 +22,7 @@ const issueSchema = z.object({
   recipientEmail: z.email().max(254), purpose: z.enum(['for_construction', 'for_review', 'for_information']),
   requestKey: z.uuid(),
 }).strict();
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const expiry = () => new Date(Date.now() + 30 * 86400000).toISOString();
 export type DistributionResult = { ok: true; id: string; deliveryStatus: string; message: string } | { ok: false; error: string };
 

@@ -24,6 +24,7 @@
 .facts dt { color: var(--text-3); font-size: 12px; line-height: 1.7; }
 .facts dd { margin: 4px 0 0; color: var(--text); font-size: 14px; font-weight: 500; line-height: 1.7; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .notice { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-2); color: var(--text-2); font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+.deliveryRow { display: flex; min-height: 44px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-block: 8px; border-top: 1px solid var(--border); }
 .notice > p + p { margin-top: 8px; }
 .link { display: inline-flex; min-height: 40px; align-items: center; gap: 8px; color: var(--primary); font-size: 14px; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
 .list { margin: 0; padding: 0; list-style: none; }

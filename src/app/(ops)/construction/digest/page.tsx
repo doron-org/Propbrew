@@ -5,6 +5,7 @@ import { operatingClock } from '@/server/operating-clock';
 import { weeklyDigest, projectEVMOf } from '@/domain/construction';
 import { DigestWorkspace, type DigestView } from '@/components/construction/digest-workspace';
 import { withDurableRead } from '@/server/data/durable-records';
+import { digestPublications, digestSourceSha256, reportingWeekOfISO } from '@/server/construction/digest-publications';
 
 /** AI Weekly Digest — a structured narrative compiled ONLY from approved records,
  *  with a source link on every section, per-section confidence, an honest
@@ -12,6 +13,7 @@ import { withDurableRead } from '@/server/data/durable-records';
 export default async function ConstructionDigestPage() {
   return withDurableRead(async () => {
   const { nowMs: NOW_MS, dateISO: TODAY } = operatingClock();
+  const WEEK = reportingWeekOfISO(TODAY);
   const { actor } = await requireCapability('reports_analytics', 'read', 'construction');
   const canMutate = can(actor, 'reports_analytics', 'update').allowed;
   const canExport = can(actor, 'reports_analytics', 'export').allowed;
@@ -23,7 +25,9 @@ export default async function ConstructionDigestPage() {
       const d = weeklyDigest(p, world, NOW_MS);
       const evm = projectEVMOf(p, world.costCodes);
       return {
-        projectId: p.id, projectName: p.name, code: p.code, weekOfISO: TODAY,
+        projectId: p.id, projectName: p.name, code: p.code, weekOfISO: WEEK,
+        sourceSha256: digestSourceSha256(p.id, WEEK, d.sections, d.coverageGaps),
+        publications: digestPublications().filter((row) => row.tenantId === actor.tenantId && row.projectId === p.id).slice(0, 8),
         sections: d.sections,
         coverageGaps: d.coverageGaps,
         deltas: [

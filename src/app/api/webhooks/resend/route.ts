@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { verifyResendSignature } from '@/server/integrations/resend-signature';
 import { recordTransmittalDeliveryEvent } from '@/server/construction/transmittal-delivery';
+import { recordDigestDeliveryEvent } from '@/server/construction/digest-publications';
 
 export const runtime = 'nodejs';
 const schema = z.object({ type: z.string(), created_at: z.string(), data: z.object({ email_id: z.string().optional(), to: z.array(z.string()).optional(), tags: z.union([z.record(z.string(), z.string()), z.array(z.object({ name: z.string(), value: z.string() }))]).optional() }).passthrough() }).passthrough();
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return new Response('Invalid event.', { status: 400 });
   try {
     await recordTransmittalDeliveryEvent({ ...parsed.data, id: request.headers.get('svix-id')! });
+    await recordDigestDeliveryEvent({ ...parsed.data, id: request.headers.get('svix-id')! });
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
   } catch { return new Response('Delivery event could not be saved.', { status: 503 }); }
 }
