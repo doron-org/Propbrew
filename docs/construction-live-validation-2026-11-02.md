@@ -6,12 +6,20 @@ The private review tenant contains four **sample** construction projects, zero c
 
 Automated fixture checks pass for IFC parsing, model geometry comparisons, BCF 3.0 comments/viewpoints/snapshots round trips, OCR page extraction, exact-page citation checks and forecast cohort/drift calculations. They establish code behavior under controlled inputs, not performance on consultant files or completed projects.
 
+## Live email infrastructure check · 2 November 2026
+
+`updates.usepropbrew.com` is verified in Resend, with the required DKIM and sending CNAME records published through Namecheap. The production Propbrew app has `RESEND_API_KEY`, `EMAIL_FROM` (`Propbrew Construction <construction@updates.usepropbrew.com>`) and `RESEND_WEBHOOK_SECRET`; the signed webhook at `https://app.usepropbrew.com/api/webhooks/resend` is enabled. The live app health endpoint returned OK after deployment of commit `3e7bd44`.
+
+Two controlled messages containing no customer or project data were submitted through the production sender configuration. Resend recorded `delivered@resend.dev` as **Delivered** (email ID `01a19b4c-1ed2-7e14-90a6-210674c516c6`; webhook event `msg_3LXiTYy20VPxEzOBViGw2fUtr2d`) and `bounced@resend.dev` as **Bounced** (email ID `01a19b4c-4d5b-7025-b684-3bc5240d4dcd`; webhook event `msg_3LXiV2NM5bLPqsFxl4oRgq34uy7`). Each signed webhook reached Propbrew once and received HTTP 200. These emails were sent directly through Resend's API with the deployed service's sender configuration, without a project transmittal or digest tag. They establish provider and callback connectivity, but they do **not** establish that a construction record changed status in PostgreSQL, that a PDF attachment arrived, or that an external recipient acknowledged it.
+
+The production `NEXT_PUBLIC_SITE_URL` and `BETTER_AUTH_URL` still point to the Railway hostname. Before a customer-facing transmittal, verify the acknowledgement link on the intended `app.usepropbrew.com` origin and review any auth-origin change for session impact.
+
 ## Live acceptance gates
 
 | Gate | Required evidence | Status |
 | --- | --- | --- |
-| External transmittal delivery | Verified Resend domain and sender, configured signed webhook, provider email IDs, `delivered@resend.dev` and `bounced@resend.dev` callbacks, retry audit, external receipt acknowledgement | Open: sender/domain/webhook unavailable |
-| Weekly digest delivery | Manager-approved project/week snapshot, named recipients, provider acceptance and delivered/bounced callbacks, durable publication after reload | Publication and safe-failure paths built; live delivery open |
+| External transmittal delivery | Verified Resend domain and sender, configured signed webhook, provider email IDs, `delivered@resend.dev` and `bounced@resend.dev` callbacks, retry audit, external receipt acknowledgement | Sender, provider delivery/bounce and signed callback HTTP 200 verified. In-app record persistence, PDF attachment, acknowledgement and retry remain open. |
+| Weekly digest delivery | Manager-approved project/week snapshot, named recipients, provider acceptance and delivered/bounced callbacks, durable publication after reload | Publication and safe-failure paths built; live tagged publication/delivery remains open. |
 | Forecast accuracy by type and region | At least 20 eligible **real completed** projects in each reported cohort; a forecast saved at least 14 days before closeout; final NGN actual cost, finish date, type and region | Open: review tenant has zero eligible outcomes |
 | Drift review | Two non-overlapping ten-project completion windows; reviewer examines the alert, project mix and source changes | Open: insufficient eligible outcomes |
 | Clash and BCF interoperability | Consultant-issued IFC/BCFZIP revision pair, recorded file provenance, element-level clash review, BCF export opened by the consultant's tool with comments, snapshots and viewpoints retained | Open: no consultant files supplied |
@@ -19,8 +27,8 @@ Automated fixture checks pass for IFC parsing, model geometry comparisons, BCF 3
 
 ## Operator procedure
 
-1. Connect Resend with a sender domain owned by Propbrew. Add `RESEND_API_KEY`, `EMAIL_FROM` and `RESEND_WEBHOOK_SECRET` in Railway without pasting credentials into a ticket or chat. Register `https://app.usepropbrew.com/api/webhooks/resend` for `email.delivered`, `email.bounced`, `email.delivery_delayed`, `email.complained` and `email.suppressed`.
-2. Issue one approved drawing PDF to each Resend test address. Save the transmittal ID, recipient, PDF SHA-256, provider email ID, webhook event ID, final status and audit export. Verify the delivered link can be acknowledged; verify a bounced issue can be retried only after reviewing its address. Resend documents the two test recipients at <https://resend.com/changelog/sending-test-emails>.
+1. Keep the verified Resend domain, Railway sender variables and webhook enabled. Its subscriptions include `email.delivered`, `email.bounced`, `email.delivery_delayed`, `email.complained`, `email.suppressed` and `email.failed`. Check all production domains and callback URLs before changing the app's public/auth origin.
+2. From an authorised **non-demo** construction company account, issue one approved drawing PDF to each Resend test address. Save the transmittal ID, recipient, PDF SHA-256, provider email ID, webhook event ID, final PostgreSQL status and audit export. Verify the delivered link can be acknowledged; verify a bounced issue can be retried only after reviewing its address. Resend documents the two test recipients at <https://resend.com/changelog/sending-test-emails>.
 3. Publish a weekly digest from a real active project to an authorised internal test recipient. Confirm the reviewed snapshot, coverage gaps and recipient status survive a restart. Review the received email against source records; a provider acceptance alone is not a delivery receipt.
 4. For each real project outcome, confirm completion lifecycle event, positive NGN actual cost, type, region and a forecast captured at least 14 days before closeout. Review cohort holdout coverage and any drift signal with the project team. Do not label a cohort calibrated below 20 eligible outcomes.
 5. Import consultant IFC revisions, run precise clash detection, review each candidate with the engineer, then export and reopen BCFZIP in the consultant's authoring tool. Keep original files and signed review findings.
