@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { nativeAuthEnabled, nativeRequestOriginAllowed } from '@/server/auth/mode';
+import { nativeAuthEnabled, nativePublicFormOriginAllowed, nativeRequestOriginAllowed } from '@/server/auth/mode';
 import { accountJson, accountResponse } from '@/server/auth/request';
 
 const origin = 'https://app.propbrew.example';
@@ -65,6 +65,30 @@ describe('native account origin authority', () => {
     expect(nativeAuthEnabled()).toBe(true);
     vi.stubEnv('PROPBREW_AUTH_MODE', ''); vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', 'company');
     expect(nativeAuthEnabled()).toBe(false);
+  });
+});
+
+describe('public email acknowledgement origin authority', () => {
+  it('accepts an email form with a trusted same-origin referrer when Origin is absent', () => {
+    vi.stubEnv('PROPBREW_AUTH_ORIGINS', 'https://app.usepropbrew.com');
+    const req = request('token=test', {
+      Origin: '', Referer: 'https://app.usepropbrew.com/construction/transmittals/acknowledge?token=test',
+      'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/x-www-form-urlencoded',
+    });
+    expect(nativePublicFormOriginAllowed(req)).toBe(true);
+    expect(nativeRequestOriginAllowed(req)).toBe(false);
+  });
+
+  it('rejects cross-site submissions and untrusted referrers', () => {
+    vi.stubEnv('PROPBREW_AUTH_ORIGINS', 'https://app.usepropbrew.com');
+    expect(nativePublicFormOriginAllowed(request('token=test', {
+      Origin: '', Referer: 'https://app.usepropbrew.com/construction/transmittals/acknowledge',
+      'Sec-Fetch-Site': 'cross-site',
+    }))).toBe(false);
+    expect(nativePublicFormOriginAllowed(request('token=test', {
+      Origin: '', Referer: 'https://attacker.example/acknowledge',
+      'Sec-Fetch-Site': 'same-origin',
+    }))).toBe(false);
   });
 });
 
