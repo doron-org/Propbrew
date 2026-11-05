@@ -38,7 +38,10 @@ test('a project manager publishes a durable weekly digest and sees failed delive
   await page.goto('/construction/digest');
   await expect(page.getByText(projectName, { exact: true }).first()).toBeVisible();
   await page.getByRole('group', { name: 'Select digest project' }).getByRole('button', { name: projectName, exact: true }).click();
-  await page.getByRole('button', { name: "I've reviewed the gaps", exact: true }).click();
+  // Gap dates are counted from the project start (fixed 2 Nov 2026), so a
+  // project created today legitimately has no gaps and no review button.
+  const gapReview = page.getByRole('button', { name: "I've reviewed the gaps", exact: true });
+  if (await gapReview.isVisible()) await gapReview.click();
   await page.getByRole('tab', { name: 'Draft digest', exact: true }).click();
   const recipient = `recipient-${id}@example.test`;
   await page.getByLabel('Recipient email addresses · one per line or comma separated').fill(recipient);
