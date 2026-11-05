@@ -175,7 +175,7 @@ describe('Deep Clinexa composition across the complete Construction module', () 
     expect(component('evm-cockpit')).toContain('Illustrative interpolated curves');
     expect(component('command-center')).not.toContain('animate-ping');
     expect(component('digest-workspace')).toContain('not calibrated certainty');
-    expect(component('digest-workspace')).toContain('does not save a publication or send messages');
+    expect(component('digest-workspace')).toContain('Demo publications save without sending.');
     expect(component('documents-workspace')).toContain('The exact PDF revision will be attached to the email');
     expect(component('audit-workspace')).toContain('not a certified immutable');
   });

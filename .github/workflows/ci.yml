@@ -56,6 +56,10 @@ jobs:
 
       - run: npm ci
 
+      # tests/mobile imports the field app sources, whose tsconfig extends expo/tsconfig.base
+      - name: Install mobile app dependencies
+        run: npm ci --prefix apps/mobile
+
       - name: Typecheck
         run: npx tsc --noEmit
 

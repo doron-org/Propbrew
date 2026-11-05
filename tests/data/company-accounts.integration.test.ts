@@ -13,8 +13,16 @@ import { canUseCompanyModule } from '@/lib/auth/company-policy';
 import { hashPassword } from 'better-auth/crypto';
 import { DEMO_ACCOUNTS, DEMO_TENANT_ID } from '@/server/auth/demo-config';
 
-const request = vi.hoisted(() => ({ headers: new Headers() }));
-vi.mock('next/headers', () => ({ headers: async () => request.headers }));
+const request = vi.hoisted(() => ({ headers: new Headers(), cookies: new Map<string, string>() }));
+vi.mock('next/headers', () => ({
+  headers: async () => request.headers,
+  cookies: async () => ({
+    get: (name: string) => (request.cookies.has(name) ? { name, value: request.cookies.get(name)! } : undefined),
+    getAll: () => [...request.cookies].map(([name, value]) => ({ name, value })),
+    set: (name: string, value: string) => { request.cookies.set(name, value); },
+    delete: (name: string) => { request.cookies.delete(name); },
+  }),
+}));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
 // This suite must never be pointed at a deployed or application database.
@@ -181,7 +189,7 @@ describe.skipIf(!testUrl)('native company accounts with real restricted PostgreS
     expect(workspaces.rows).toHaveLength(2);
     for (const row of workspaces.rows) {
       expect(row.domain_tenant_id).toBe(row.tenant_id);
-      expect(Object.keys(row.payload.collections)).toHaveLength(105);
+      expect(Object.keys(row.payload.collections)).toHaveLength(106);
       for (const [key, value] of Object.entries(row.payload.collections)) {
         if (key === 'shortletPlanKey') expect(value).toBe('lite');
         else if (key === 'shortletBookingPage') expect(value).toEqual({ enabled: false, slug: 'portfolio', cancellationPolicy: '', holdHours: 0, promoCodes: [] });
@@ -367,7 +375,7 @@ describe.skipIf(!testUrl)('native company accounts with real restricted PostgreS
     const actions = await import('@/server/actions/companies');
     request.headers = new Headers({ cookie: cookieHeader(ownerA) });
     const form = new FormData();
-    form.set('memberId', old.membership.membershipId); form.set('companyRole', 'member'); form.set('module:estate', 'view');
+    form.set('memberId', old.membership.membershipId); form.set('companyRole', 'member'); form.set('operationalProfileId', 'auditor');
     expect(await actions.updateCompanyMember(form)).toHaveProperty('message');
     await expect(withAuthTransaction(recipient.identity.user.id, (client) => recheckCompanyMembership(client, old))).rejects.toThrow('access changed');
     const fresh = await companyPrincipalFor(recipient.identity);
