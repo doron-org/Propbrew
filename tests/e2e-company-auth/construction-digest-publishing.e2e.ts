@@ -54,6 +54,10 @@ test('a project manager publishes a durable weekly digest and sees failed delive
   await page.reload();
   await expect(page.getByText(recipient, { exact: false })).toBeVisible();
   await expect(page.getByText('Email sender or delivery callback is not configured.', { exact: false })).toBeVisible();
-  await page.getByRole('tab', { name: 'Draft digest', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Review and publish digest', exact: true })).toBeDisabled();
+  // Retry only this reversible tab switch: on slow runners the first click can
+  // land before hydration and be swallowed, leaving the draft panel hidden.
+  await expect(async () => {
+    await page.getByRole('tab', { name: 'Draft digest', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Review and publish digest', exact: true })).toBeDisabled({ timeout: 5_000 });
+  }).toPass({ timeout: 30_000 });
 });

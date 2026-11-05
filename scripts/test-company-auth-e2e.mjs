@@ -86,6 +86,31 @@ try {
     await new Promise((resolveWait) => setTimeout(resolveWait, 400));
   }
   if (!ready) throw new Error('The disposable native-account app did not become ready.');
+  if (safeEnv.CI) {
+    // A shared CI runner compiles dev routes far too slowly to finish inside
+    // test interaction timeouts, so compile every route the workflows visit
+    // up front. Dynamic segments compile per route pattern; a placeholder id
+    // still triggers the compilation even though the record does not exist.
+    const routes = [
+      '/', '/login', '/sign-up', '/onboarding', '/workspaces',
+      '/estate', '/properties', '/facility', '/shortlet', '/construction',
+      '/assets', '/billing', '/bookings', '/companies', '/company/team', '/inspections',
+      '/inventory', '/people', '/ppm', '/spaces', '/tenancy', '/work-orders',
+      '/shortlet/bookings', '/shortlet/properties',
+      '/construction/projects', '/construction/digest', '/construction/documents',
+      '/construction/field', '/construction/operations',
+      '/construction/projects/prewarm', '/construction/projects/prewarm/setup', '/construction/projects/prewarm/lifecycle',
+      '/construction/portal/client', '/construction/portal/consultant', '/construction/portal/field', '/construction/portal/subcontractor',
+      '/properties/prewarm', '/properties/prewarm/units',
+      '/facility/sites/prewarm', '/facility/sites/prewarm/assets',
+      '/work-orders/prewarm', '/estate/work-orders/prewarm',
+      '/shortlet/properties/prewarm', '/shortlet/properties/prewarm/rooms',
+      '/invite/prewarm', '/api/auth/ok',
+    ];
+    for (const route of routes) {
+      try { await fetch(`${origin}${route}`, { redirect: 'manual', signal: AbortSignal.timeout(120_000) }); } catch { /* the compilation, not the response, is the point */ }
+    }
+  }
   await run(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', '--config', 'playwright.company-auth.config.ts', ...process.argv.slice(2)], { cwd: root, visible: true, env: { ...safeEnv, PW_COMPANY_BASE_URL: origin } });
 } catch (error) {
   const log = await readFile(join(directory, 'next.log'), 'utf8').catch(() => '');
