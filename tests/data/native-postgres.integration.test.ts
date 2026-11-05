@@ -40,8 +40,8 @@ describe.skipIf(!testUrl)('native Postgres migrations and tenant isolation', () 
   it('applies all migrations and reruns without replaying them', async () => {
     await runMigrations({ url: testUrl });
     const migrations = await admin.query('select filename from schema_migrations order by filename');
-    expect(migrations.rows).toHaveLength(12);
-    expect(migrations.rows.at(-1)?.filename).toBe('013_facility_operating_setup.sql');
+    expect(migrations.rows).toHaveLength(21);
+    expect(migrations.rows.at(-1)?.filename).toBe('022_construction_field_photos.sql');
     const functions = await admin.query("select proname from pg_proc where proname in ('reserve_copilot_budget', 'finish_copilot_budget')");
     expect(functions.rows).toHaveLength(2);
   });
