@@ -73,7 +73,9 @@ test('a private invitation creates a teammate account in the existing company wi
   await page.getByRole('button', { name: 'Invite teammate', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: `Invite a teammate to ${company}`, exact: true });
   await dialog.getByLabel('Teammate email address', { exact: true }).fill(email);
-  await dialog.getByRole('combobox', { name: 'Estate', exact: true }).selectOption('view');
+  // Members require an operational user type; the auditor profile is the
+  // read-only Estate view this scenario asserts.
+  await dialog.getByRole('combobox', { name: 'User type', exact: true }).selectOption('auditor');
   await dialog.getByRole('button', { name: 'Create invitation link', exact: true }).click();
   const invite = dialog.getByLabel('Private invitation link', { exact: true });
   await expect(invite).toBeVisible();

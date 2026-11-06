@@ -1,6 +1,8 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
+import { request as httpRequest } from 'node:http';
+import { createServer as createTlsServer } from 'node:https';
 import { closeSync, constants, existsSync, openSync } from 'node:fs';
 import { cp, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -41,7 +43,7 @@ function freePort() {
     socket.listen(0, '127.0.0.1', () => { const address = socket.address(); socket.close(() => resolvePort(address.port)); });
   });
 }
-let started = false, server, output;
+let started = false, server, output, tls;
 try {
   const pgPort = await freePort(), appPort = await freePort();
   await run(program('initdb'), ['-D', data, '-U', 'propbrew_company_browser_admin', '--auth=trust', '--no-locale', '--encoding=UTF8']);
@@ -65,7 +67,13 @@ try {
   // Next generates next-env.d.ts itself; it is absent in a clean Git checkout.
   for (const name of ['package.json', 'package-lock.json', 'next.config.ts', 'tsconfig.json', 'postcss.config.mjs']) await cp(join(root, name), join(app, name));
   await symlink(resolve(root, 'node_modules'), join(app, 'node_modules'), 'dir');
-  const origin = `http://127.0.0.1:${appPort}`;
+  // A shared CI runner cannot keep up with dev-mode compilation, so CI builds
+  // once and serves the production bundle instead. The bundle hard-requires an
+  // HTTPS account origin, which a plain loopback server cannot provide, so a
+  // self-signed TLS proxy fronts it. Local runs keep the fast dev server.
+  const production = Boolean(safeEnv.CI);
+  const tlsPort = production ? await freePort() : 0;
+  const origin = production ? `https://127.0.0.1:${tlsPort}` : `http://127.0.0.1:${appPort}`;
   const env = {
     ...safeEnv, NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1',
     DATABASE_URL: `postgresql://propbrew_review_app@127.0.0.1:${pgPort}/postgres`,
@@ -76,47 +84,46 @@ try {
     CLERK_SECRET_KEY: '', NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
     OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', BLOB_READ_WRITE_TOKEN: '',
   };
+  if (production) {
+    const keyFile = join(directory, 'tls.key'), certFile = join(directory, 'tls.crt');
+    await run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', keyFile, '-out', certFile, '-days', '1', '-subj', '/CN=127.0.0.1']);
+    // The build receives only the client-inlined values: handing it runtime
+    // database/auth settings breaks static prerendering of public pages, and
+    // server settings are still read per request at start time.
+    const buildEnv = {
+      ...safeEnv, NEXT_TELEMETRY_DISABLED: '1',
+      NEXT_PUBLIC_SITE_URL: origin, NEXT_PUBLIC_DEV_IDENTITY: '0', NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
+    };
+    await run(process.execPath, [join(root, 'node_modules/next/dist/bin/next'), 'build', '--webpack'], { cwd: app, env: buildEnv, visible: true });
+  }
   output = openSync(join(directory, 'next.log'), 'w', 0o600);
-  server = spawn(process.execPath, [join(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', String(appPort)], { cwd: app, env, detached: true, stdio: ['ignore', output, output] });
+  server = spawn(process.execPath, [join(root, 'node_modules/next/dist/bin/next'), ...(production ? ['start'] : ['dev', '--webpack']), '--hostname', '127.0.0.1', '--port', String(appPort)], { cwd: app, env, detached: true, stdio: ['ignore', output, output] });
+  if (production) {
+    tls = createTlsServer({ key: await readFile(join(directory, 'tls.key')), cert: await readFile(join(directory, 'tls.crt')) }, (request, response) => {
+      const upstream = httpRequest({ host: '127.0.0.1', port: appPort, path: request.url, method: request.method, headers: request.headers }, (reply) => {
+        response.writeHead(reply.statusCode ?? 502, reply.headers);
+        reply.pipe(response);
+      });
+      upstream.on('error', () => { if (!response.headersSent) response.writeHead(502); response.end(); });
+      request.pipe(upstream);
+    });
+    await new Promise((resolveListen, rejectListen) => { tls.once('error', rejectListen); tls.listen(tlsPort, '127.0.0.1', resolveListen); });
+  }
   const deadline = Date.now() + 120_000;
   let ready = false;
   while (Date.now() < deadline) {
     if (server.exitCode !== null) break;
-    try { const response = await fetch(`${origin}/api/v1/health`, { signal: AbortSignal.timeout(2000) }); if (response.ok) { ready = true; break; } } catch { /* startup is still in progress */ }
+    try { const response = await fetch(`http://127.0.0.1:${appPort}/api/v1/health`, { signal: AbortSignal.timeout(2000) }); if (response.ok) { ready = true; break; } } catch { /* startup is still in progress */ }
     await new Promise((resolveWait) => setTimeout(resolveWait, 400));
   }
   if (!ready) throw new Error('The disposable native-account app did not become ready.');
-  if (safeEnv.CI) {
-    // A shared CI runner compiles dev routes far too slowly to finish inside
-    // test interaction timeouts, so compile every route the workflows visit
-    // up front. Dynamic segments compile per route pattern; a placeholder id
-    // still triggers the compilation even though the record does not exist.
-    const routes = [
-      '/', '/login', '/sign-up', '/onboarding', '/workspaces',
-      '/estate', '/properties', '/facility', '/shortlet', '/construction',
-      '/assets', '/billing', '/bookings', '/companies', '/company/team', '/inspections',
-      '/inventory', '/people', '/ppm', '/spaces', '/tenancy', '/work-orders',
-      '/shortlet/bookings', '/shortlet/properties',
-      '/construction/projects', '/construction/digest', '/construction/documents',
-      '/construction/field', '/construction/operations',
-      '/construction/projects/prewarm', '/construction/projects/prewarm/setup', '/construction/projects/prewarm/lifecycle',
-      '/construction/portal/client', '/construction/portal/consultant', '/construction/portal/field', '/construction/portal/subcontractor',
-      '/properties/prewarm', '/properties/prewarm/units',
-      '/facility/sites/prewarm', '/facility/sites/prewarm/assets',
-      '/work-orders/prewarm', '/estate/work-orders/prewarm',
-      '/shortlet/properties/prewarm', '/shortlet/properties/prewarm/rooms',
-      '/invite/prewarm', '/api/auth/ok',
-    ];
-    for (const route of routes) {
-      try { await fetch(`${origin}${route}`, { redirect: 'manual', signal: AbortSignal.timeout(120_000) }); } catch { /* the compilation, not the response, is the point */ }
-    }
-  }
   await run(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', '--config', 'playwright.company-auth.config.ts', ...process.argv.slice(2)], { cwd: root, visible: true, env: { ...safeEnv, PW_COMPANY_BASE_URL: origin } });
 } catch (error) {
   const log = await readFile(join(directory, 'next.log'), 'utf8').catch(() => '');
   if (log) console.error(log.slice(-6000));
   throw error;
 } finally {
+  tls?.close();
   if (server?.pid && server.exitCode === null) {
     const stopped = new Promise((resolveStop) => server.once('exit', resolveStop));
     try { process.kill(-server.pid, 'SIGTERM'); } catch { /* already stopped */ }

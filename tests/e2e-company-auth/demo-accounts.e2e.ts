@@ -92,9 +92,12 @@ for (const workspace of workspaces) {
       await page.goto('/properties');
       await expect(page.getByRole('table', { name: 'Property list', exact: true })).toContainText('Lekki Gardens Estate');
     } else if (workspace.module === 'facility') {
+      // Sensor cards live under their own tab; the overview default does not list them.
+      await selectTab(page.getByRole('tab', { name: /^Sensor readings(?: \d+)?$/ }), page.getByRole('tabpanel', { name: /^Sensor readings(?: \d+)?$/ }));
       await expect(page.getByRole('heading', { name: 'Diesel tank — Block C', exact: true })).toBeVisible();
       await selectTab(page.getByRole('tab', { name: /^Alarms(?: \d+)?$/ }), page.getByRole('tabpanel', { name: /^Alarms(?: \d+)?$/ }));
-      await expect(page.getByText('Coolant temperature high — sustained overheating', { exact: true })).toBeVisible();
+      // The overview activity feed repeats the latest alarm, so scope to the alarms panel.
+      await expect(page.getByRole('tabpanel', { name: /^Alarms(?: \d+)?$/ }).getByText('Coolant temperature high — sustained overheating', { exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Create work order', exact: true }).first()).toBeEnabled();
       await expect(page.getByRole('button', { name: 'Acknowledge', exact: true }).first()).toBeEnabled();
     } else if (workspace.module === 'shortlet') {
