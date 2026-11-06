@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Banknote,
-  Bell,
   BookOpenCheck,
   Building2,
   CalendarDays,

@@ -111,12 +111,16 @@ test('Facility sandbox creates and edits assets and completes the normal work-or
   await page.getByRole('button', { name: 'Triage', exact: true }).click();
   const assignment = page.getByRole('dialog', { name: 'Assign work order', exact: true });
   await openDialog(page.getByRole('button', { name: 'Assign', exact: true }), assignment);
-  await assignment.getByRole('combobox', { name: 'Assignee', exact: true }).selectOption({ label: 'Demo operator' });
+  // Eligible assignees are scoped company technicians and compliant vendors;
+  // in this sandbox that is the seeded vendor organisation.
+  await assignment.getByRole('combobox', { name: 'Assignee', exact: true }).selectOption({ label: 'Brightworks Facilities · vendor' });
   await assignment.getByRole('button', { name: 'Confirm assign', exact: true }).click();
   await expect(assignment).toHaveCount(0);
   await page.getByRole('button', { name: 'Start work', exact: true }).click();
   const resolution = page.getByRole('dialog', { name: 'Mark resolved work order', exact: true });
   await openDialog(page.getByRole('button', { name: 'Mark resolved', exact: true }), resolution);
+  // Technicians and vendors must record a completion note before resolving.
+  await resolution.getByLabel('Completion note', { exact: true }).fill('Synthetic workflow completion evidence recorded.');
   await resolution.getByRole('button', { name: 'Confirm mark resolved', exact: true }).click();
   await expect(resolution).toHaveCount(0);
   const verification = page.getByRole('dialog', { name: 'Verify work order', exact: true });

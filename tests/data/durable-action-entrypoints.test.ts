@@ -17,6 +17,10 @@ const nonOperational = new Set([
 const readOnly = new Set(['ask-data.ts:askData', 'documents.ts:searchDocuments']);
 const ownReadState = new Set(['inbox.ts:markNotificationsRead', 'inbox.ts:readThread']);
 const explicitAction = new Map([['construction.ts:createRfi', 'create'], ['construction.ts:reviewRfiAnswer', 'approve']]);
+const delegates = new Map([
+  ['construction.ts:publishDigest', 'publishConstructionDigest'],
+  ['construction.ts:retryPublishedDigestRecipient', 'retryDigestRecipient'],
+]);
 const expectedModules: Record<string, readonly string[]> = {
   'admin-users.ts': ['estate', 'facility', 'shortlet', 'construction'],
   'construction-forecast.ts': ['construction'],
@@ -41,14 +45,18 @@ const entries = readdirSync(directory).filter((file) => file.endsWith('.ts')).fl
 const operational = entries.filter(({ key }) => !nonOperational.has(key));
 
 describe('operational action durability coverage', () => {
-  it('accounts for all 256 operational actions and the explicit separate account/onboarding actions', () => {
-    expect(operational).toHaveLength(256);
+  it('accounts for all 257 operational actions and the explicit separate account/onboarding actions', () => {
+    expect(operational).toHaveLength(257);
     expect(entries.filter(({ key }) => nonOperational.has(key)).map(({ key }) => key).sort()).toEqual([...nonOperational].sort());
     expect(operational.filter(({ key }) => readOnly.has(key))).toHaveLength(2);
-    expect(operational.filter(({ key }) => !readOnly.has(key))).toHaveLength(254);
+    expect(operational.filter(({ key }) => !readOnly.has(key))).toHaveLength(255);
   });
 
   it.each(operational)('protects the entire authenticated $key body', ({ ast, fn, key, file }) => {
+    if (delegates.has(key)) {
+      expect(fn.getText(ast), key + ' must delegate to its durable server function').toContain(delegates.get(key) + '(');
+      return;
+    }
     const expected = readOnly.has(key) ? 'withDurableRead' : 'withDurableMutation';
     expect(fn.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword)).toBe(true);
     const body = fn.body!.statements.filter((node) => !(ts.isExpressionStatement(node) && ts.isStringLiteral(node.expression)));

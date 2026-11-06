@@ -10,8 +10,16 @@ import { addEstateProperty } from '@/server/actions/estate-registration';
 import { EMPTY_OWNER_SETUP, type OwnerSetupDraft } from '@/domain/owner-onboarding';
 import { completeNativeOwnerSetup, getNativeOwnerSetup, saveNativeOwnerSetup } from '@/server/onboarding/native-repository';
 
-const request = vi.hoisted(() => ({ headers: new Headers() }));
-vi.mock('next/headers', () => ({ headers: async () => request.headers }));
+const request = vi.hoisted(() => ({ headers: new Headers(), cookies: new Map<string, string>() }));
+vi.mock('next/headers', () => ({
+  headers: async () => request.headers,
+  cookies: async () => ({
+    get: (name: string) => (request.cookies.has(name) ? { name, value: request.cookies.get(name)! } : undefined),
+    getAll: () => [...request.cookies].map(([name, value]) => ({ name, value })),
+    set: (name: string, value: string) => { request.cookies.set(name, value); },
+    delete: (name: string) => { request.cookies.delete(name); },
+  }),
+}));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
 // This suite owns synthetic accounts only in the runner's disposable cluster.

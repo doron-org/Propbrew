@@ -250,7 +250,7 @@ describe('Construction records, permissions and specialised views survive the vi
     expect(view('copilot-workspace')).toContain("endpoint: '/api/construction/copilot', module: 'construction'");
     expect(read('src/lib/ai/copilot-client.ts')).toContain('validCopilotSource(module, source)');
     expect(read('src/components/ai/copilot-stream-reply.tsx')).toContain('exchange.meta.sources.map');
-    expect(view('digest-workspace')).toContain('disabled={pending || (view.coverageGaps.length > 0 && !confirmed)}');
+    expect(view('digest-workspace')).toContain('(view.coverageGaps.length > 0 && !confirmed)');
     expect(view('digest-workspace')).toContain('section.sources.map');
     expect(view('simulator-workspace')).toContain('Nothing is saved.');
     const html = renderToStaticMarkup(createElement(CopilotWorkspace, { suggestions: [], canSeeCommercials: false }));

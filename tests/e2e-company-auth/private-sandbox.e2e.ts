@@ -68,6 +68,8 @@ test('private construction sandbox mobilises a project through WBS, programme, B
   await openDialog(page.getByRole('button', { name: 'New project', exact: true }), create);
   await create.getByLabel('Name', { exact: true }).fill(name); await create.getByLabel('Location', { exact: true }).fill('Lagos');
   await create.getByLabel('Client', { exact: true }).fill('Sample project owner');
+  await create.getByRole('combobox', { name: 'Project type', exact: true }).selectOption('residential');
+  await create.getByLabel('State or region', { exact: true }).fill('Lagos, Nigeria');
   await create.getByLabel('Contract (₦)', { exact: true }).fill('1000000'); await create.getByLabel('Budget (₦)', { exact: true }).fill('800000');
   await create.getByLabel('Planned finish', { exact: true }).fill(new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
   await create.getByRole('button', { name: 'Create project', exact: true }).click();

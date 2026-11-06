@@ -85,7 +85,7 @@ describe.skipIf(!testUrl)('durable transactional workspace records', () => {
       const identities = await import('@/server/identities');
       const domainTenant = identities.SEED.tenantA;
       const original = initialWorkspaceRecordState(domainTenant);
-      expect(Object.keys(original.collections)).toHaveLength(105);
+      expect(Object.keys(original.collections)).toHaveLength(106);
       const records = await import('@/server/data/durable-records');
       const store = await import('@/server/data/store');
       const registration = await import('@/server/actions/estate-registration');

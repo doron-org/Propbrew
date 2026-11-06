@@ -17,7 +17,7 @@ test('legacy dashboard opens the workspace chooser', async ({ page }) => {
   await page.goto('/dashboard');
   // The first development request compiles both routes before its redirect completes.
   await expect(page).toHaveURL(/\/workspaces$/, { timeout: 30_000 });
-  await expect(page.getByRole('heading', { name: 'Choose your workspace', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choose your workspace', exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('main')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Enter Estate workspace', exact: true })).toHaveAttribute('href', '/estate');
 });
@@ -62,7 +62,7 @@ test('Estate Properties supports list/grid views, unit details and navigation or
   await page.goto('/properties');
   const nav = page.getByRole('navigation', { name: 'Estate navigation', exact: true });
   const firstLinks = await nav.getByRole('link').evaluateAll((links) => links.slice(0, 3).map((link) => link.getAttribute('href')));
-  expect(firstLinks).toEqual(['/estate', '/people', '/properties']);
+  expect(firstLinks).toEqual(['/estate', '/properties']);
   await expect(page.getByRole('table', { name: 'Property list', exact: true })).toBeVisible();
   await selectPropertyView(page.getByRole('button', { name: 'Grid view', exact: true }));
   await expect(page.getByRole('button', { name: 'Grid view', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -71,6 +71,9 @@ test('Estate Properties supports list/grid views, unit details and navigation or
   await expect(page.getByRole('region', { name: 'Property register summary', exact: true })).toBeVisible();
   await page.getByRole('tab', { name: /^Properties(?: \d+)?$/ }).click();
   await expect(page.getByRole('button', { name: 'Grid view', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  // The unit register button only exists on list rows; grid cards link to the property page instead.
+  await selectPropertyView(page.getByRole('button', { name: 'List view', exact: true }));
+  await expect(page.getByRole('table', { name: 'Property list', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'View units at Lekki Gardens Estate', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Lekki Gardens Estate', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close property details', exact: true }).click();
