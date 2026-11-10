@@ -1,0 +1,182 @@
+[
+  {
+    "question": "What membrane thickness does the waterproofing specification require, and which clause says so?",
+    "answer": "The specification requires a **2 mm torch-applied bituminous sheet membrane**, stated in **Clause 7.12.1**. [LAG-SPEC-104 · Waterproofing Specification rev B · PDF page 1]",
+    "grounding": {
+      "status": "supported",
+      "supported": 1,
+      "checked": 1,
+      "message": "1 document claim matched the cited PDF pages. Verify the originals before technical decisions."
+    },
+    "recordedEvaluation": {
+      "tenantId": "46a4660b-90d2-478b-89b3-d516779bded2",
+      "feature": "construction_document_grounding",
+      "datasetVersion": "page-citation-v1",
+      "score": 1,
+      "results": {
+        "interactionId": "1546bdcb-4b39-43a5-8197-ab875b30c4d2",
+        "interactionScope": "OCR sign-off harness (synthetic scans)",
+        "checked": 1,
+        "supported": 1,
+        "findings": [
+          {
+            "sourceId": "construction-document-bfd38275-e02c-46ea-bce0-27e4a5f55615-1",
+            "verdict": "supported"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "question": "What concrete grade is specified for the foundations?",
+    "answer": "The foundation layout specifies **C30/37 concrete**. Source: **QA-STR-110 · Foundation Layout rev A · PDF page 1**.",
+    "grounding": {
+      "status": "supported",
+      "supported": 1,
+      "checked": 1,
+      "message": "1 document claim matched the cited PDF pages. Verify the originals before technical decisions."
+    },
+    "recordedEvaluation": {
+      "tenantId": "46a4660b-90d2-478b-89b3-d516779bded2",
+      "feature": "construction_document_grounding",
+      "datasetVersion": "page-citation-v1",
+      "score": 1,
+      "results": {
+        "interactionId": "ff00c68f-f4cf-4dcd-a0dd-c081a3b9b22a",
+        "interactionScope": "OCR sign-off harness (synthetic scans)",
+        "checked": 1,
+        "supported": 1,
+        "findings": [
+          {
+            "sourceId": "construction-document-20488235-e8bc-48b2-b54e-a065102efee8-1",
+            "verdict": "supported"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "question": "What are the living room dimensions on the ground floor plan?",
+    "answer": "The ground floor plan lists the living room as **4,200 × 3,600 mm** (4.2 × 3.6 m). [QA-ARC-201 · Ground Floor Plan rev C · PDF page 1]",
+    "grounding": {
+      "status": "supported",
+      "supported": 1,
+      "checked": 1,
+      "message": "1 document claim matched the cited PDF pages. Verify the originals before technical decisions."
+    },
+    "recordedEvaluation": {
+      "tenantId": "46a4660b-90d2-478b-89b3-d516779bded2",
+      "feature": "construction_document_grounding",
+      "datasetVersion": "page-citation-v1",
+      "score": 1,
+      "results": {
+        "interactionId": "9bdd262c-437d-410a-a0b0-b4072b9cb261",
+        "interactionScope": "OCR sign-off harness (synthetic scans)",
+        "checked": 1,
+        "supported": 1,
+        "findings": [
+          {
+            "sourceId": "construction-document-9dc14d78-7843-47b5-8a9f-492d4e9a2be4-1",
+            "verdict": "supported"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "question": "How long must the flood test run before screed application, and who signs the test records?",
+    "answer": "The flood test must run for **72 hours** before screed application. The test records must be signed by the **consultant engineer**. [LAG-SPEC-104 · Waterproofing Specification rev B · PDF page 2]",
+    "grounding": {
+      "status": "supported",
+      "supported": 2,
+      "checked": 2,
+      "message": "2 document claims matched the cited PDF pages. Verify the originals before technical decisions."
+    },
+    "recordedEvaluation": {
+      "tenantId": "46a4660b-90d2-478b-89b3-d516779bded2",
+      "feature": "construction_document_grounding",
+      "datasetVersion": "page-citation-v1",
+      "score": 1,
+      "results": {
+        "interactionId": "b45b5df1-5625-476d-ab97-8b406747efac",
+        "interactionScope": "OCR sign-off harness (synthetic scans)",
+        "checked": 2,
+        "supported": 2,
+        "findings": [
+          {
+            "sourceId": "construction-document-bfd38275-e02c-46ea-bce0-27e4a5f55615-2",
+            "verdict": "supported"
+          },
+          {
+            "sourceId": "construction-document-bfd38275-e02c-46ea-bce0-27e4a5f55615-2",
+            "verdict": "supported"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "question": "What reinforcement is specified in footing F1?",
+    "answer": "Footing F1 specifies **Y16 reinforcement at 200 mm centres, both ways at the bottom**. [QA-STR-110 · Foundation Layout rev A · PDF page 1]",
+    "grounding": {
+      "status": "supported",
+      "supported": 1,
+      "checked": 1,
+      "message": "1 document claim matched the cited PDF pages. Verify the originals before technical decisions."
+    },
+    "recordedEvaluation": {
+      "tenantId": "46a4660b-90d2-478b-89b3-d516779bded2",
+      "feature": "construction_document_grounding",
+      "datasetVersion": "page-citation-v1",
+      "score": 1,
+      "results": {
+        "interactionId": "a40744e2-7873-4254-9195-5c0c95632397",
+        "interactionScope": "OCR sign-off harness (synthetic scans)",
+        "checked": 1,
+        "supported": 1,
+        "findings": [
+          {
+            "sourceId": "construction-document-20488235-e8bc-48b2-b54e-a065102efee8-1",
+            "verdict": "supported"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "question": "What is the specified pile depth for the foundations?",
+    "answer": "The available foundation layout does not specify pile depth. It lists pad footings F1 (450 mm deep) and F2 (400 mm deep), but these are not pile depths. [QA-STR-110 · Foundation Layout rev A · PDF page 1]",
+    "grounding": {
+      "status": "needs_review",
+      "supported": 2,
+      "checked": 3,
+      "message": "1 of 3 document claims need citation or source review. Check the linked PDF pages before relying on them."
+    },
+    "recordedEvaluation": {
+      "tenantId": "46a4660b-90d2-478b-89b3-d516779bded2",
+      "feature": "construction_document_grounding",
+      "datasetVersion": "page-citation-v1",
+      "score": 0.6666666666666666,
+      "results": {
+        "interactionId": "c92f2dff-e263-4d86-8a51-67899087697b",
+        "interactionScope": "OCR sign-off harness (synthetic scans)",
+        "checked": 3,
+        "supported": 2,
+        "findings": [
+          {
+            "sourceId": "construction-document-20488235-e8bc-48b2-b54e-a065102efee8-1",
+            "verdict": "supported"
+          },
+          {
+            "sourceId": "construction-document-20488235-e8bc-48b2-b54e-a065102efee8-1",
+            "verdict": "supported"
+          },
+          {
+            "sourceId": "construction-document-20488235-e8bc-48b2-b54e-a065102efee8-1",
+            "verdict": "unclear"
+          }
+        ]
+      }
+    }
+  }
+]
