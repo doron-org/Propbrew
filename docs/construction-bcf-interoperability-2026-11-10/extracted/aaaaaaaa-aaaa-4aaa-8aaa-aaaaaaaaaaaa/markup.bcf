@@ -1,0 +1,25 @@
+<Markup>
+  <Topic Guid="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" TopicType="Clash" TopicStatus="Open">
+    <Title>Duct and beam coordination review</Title>
+    <CreationDate>2026-11-10T09:00:00.000Z</CreationDate>
+    <CreationAuthor>Propbrew interoperability harness</CreationAuthor>
+    <ModifiedDate>2026-11-10T09:15:00.000Z</ModifiedDate>
+    <ModifiedAuthor>Propbrew interoperability harness</ModifiedAuthor>
+    <Description>Synthetic interoperability evidence; consultant review remains open.</Description>
+    <Comments>
+      <Comment Guid="cccccccc-cccc-4ccc-8ccc-cccccccccccc">
+        <Date>2026-11-10T09:10:00.000Z</Date>
+        <Author>Propbrew interoperability harness</Author>
+        <Comment>Retain this comment, camera, component ID and snapshot on import.</Comment>
+        <Viewpoint Guid="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"/>
+      </Comment>
+    </Comments>
+    <Viewpoints>
+      <ViewPoint Guid="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb">
+        <Viewpoint>coordination.bcfv</Viewpoint>
+        <Snapshot>coordination.png</Snapshot>
+        <Index>0</Index>
+      </ViewPoint>
+    </Viewpoints>
+  </Topic>
+</Markup>

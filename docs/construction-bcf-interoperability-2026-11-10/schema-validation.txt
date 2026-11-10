@@ -1,0 +1,17 @@
+Official BCF-XML schema validation — 10 November 2026
+Upstream: https://github.com/buildingSMART/BCF-XML
+Branch: release_3_0
+Commit: bc48611d0d7a1587f028a2b69677a1aafd5cd0a8
+Validator: /usr/bin/xmllint
+
+$ xmllint --noout --schema ../BCF-XML/Schemas/version.xsd docs/construction-bcf-interoperability-2026-11-10/extracted/bcf.version
+docs/construction-bcf-interoperability-2026-11-10/extracted/bcf.version validates
+
+$ xmllint --noout --schema ../BCF-XML/Schemas/project.xsd docs/construction-bcf-interoperability-2026-11-10/extracted/project.bcfp
+docs/construction-bcf-interoperability-2026-11-10/extracted/project.bcfp validates
+
+$ xmllint --noout --schema ../BCF-XML/Schemas/markup.xsd docs/construction-bcf-interoperability-2026-11-10/extracted/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/markup.bcf
+docs/construction-bcf-interoperability-2026-11-10/extracted/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/markup.bcf validates
+
+$ xmllint --noout --schema ../BCF-XML/Schemas/visinfo.xsd docs/construction-bcf-interoperability-2026-11-10/extracted/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/coordination.bcfv
+docs/construction-bcf-interoperability-2026-11-10/extracted/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/coordination.bcfv validates
