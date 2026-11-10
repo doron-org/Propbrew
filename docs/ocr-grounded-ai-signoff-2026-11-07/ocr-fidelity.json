@@ -1,0 +1,49 @@
+[
+  {
+    "number": "QA-ARC-201",
+    "pages": [
+      {
+        "page": 1,
+        "method": "ocr",
+        "hits": 7,
+        "of": 7,
+        "missing": [],
+        "text": "GROUND FLOOR PLAN — BLOCK A SCALE 1:100 STATUS: APPROVED FOR CONSTRUCTION 1 2 3 A LIVING ROOM 4200 x 3600 KITCHEN 3000 x 3300 B BEDROOM 1 3600 x 3300 WALLS: 230mm SANDCRETE BLOCK DOOR D1 900x2100 DOOR D2 800x2100 GLA 118.5 m2 C PROJECT DELIVERY VALIDATION PILOT DRAWING QA-ARC-201 REVISION C DATE 2026-10-15 TITLE GROUND FLOOR PLAN DISCIPLINE ARCHITECTURAL"
+      }
+    ]
+  },
+  {
+    "number": "LAG-SPEC-104",
+    "pages": [
+      {
+        "page": 1,
+        "method": "ocr",
+        "hits": 7,
+        "of": 7,
+        "missing": [],
+        "text": "SPECIFICATION SECTION 07 12 00 WATERPROOFING Clause 7.12.1: Membrane shall be 2 mm torch-applied bituminous sheet. Clause 7.12.2: Lap joints minimum 100 mm, fully sealed with torch. Clause 7.12.3: Primer coverage 0.3 L/m2 on prepared concrete substrate. Clause 7.12.4: Protection board 3 mm before backfilling. PROJECT DELIVERY VALIDATION PILOT DRAWING LAG-SPEC-104 REVISION B DATE 2026-09-28 TITLE WATERPROOFING SPEC 1/2 DISCIPLINE SPECIFICATION"
+      },
+      {
+        "page": 2,
+        "method": "ocr",
+        "hits": 6,
+        "of": 6,
+        "missing": [],
+        "text": "SPECIFICATION SECTION 07 13 00 WATERPROOFING TESTING Clause 7.13.1: Flood test for 72 hours before screed application. Clause 7.13.2: Maximum deflection L/500 under service load. Clause 7.13.3: Test records signed by the consultant engineer. PROJECT DELIVERY VALIDATION PILOT DRAWING LAG-SPEC-104 REVISION B DATE 2026-09-28 TITLE WATERPROOFING SPEC 2/2 DISCIPLINE SPECIFICATION"
+      }
+    ]
+  },
+  {
+    "number": "QA-STR-110",
+    "pages": [
+      {
+        "page": 1,
+        "method": "ocr",
+        "hits": 6,
+        "of": 6,
+        "missing": [],
+        "text": "FOUNDATION LAYOUT — BLOCK A FOOTING F1 1800 x 1800 x 450 DEEP FOOTING F2 1500 x 1500 x 400 DEEP CONCRETE GRADE C30/37 REINFORCEMENT: Y16 @ 200 c/c BOTH WAYS BOTTOM (F1) BLINDING 75 mm C12/15 ALLOWABLE BEARING 150 kN/m2 PROJECT DELIVERY VALIDATION PILOT DRAWING QA-STR-110 REVISION A DATE 2026-10-02 TITLE FOUNDATION LAYOUT DISCIPLINE STRUCTURAL"
+      }
+    ]
+  }
+]
