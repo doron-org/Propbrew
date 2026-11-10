@@ -116,7 +116,7 @@
 .navLink:hover { color: var(--text); background: var(--surface-2); transform: translate3d(2px, 0, 0); }
 .navIcon { flex: none; width: 18px; height: 18px; opacity: .88; }
 .navLabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.navActive, .navActive:hover { color: var(--workspace-accent); background: var(--workspace-accent-weak); border-color: color-mix(in srgb, var(--workspace-accent) 8%, transparent); font-weight: 600; }
+.navActive, .navActive:hover { color: color-mix(in srgb, var(--workspace-accent) 90%, var(--text)); background: var(--workspace-accent-weak); border-color: color-mix(in srgb, var(--workspace-accent) 8%, transparent); font-weight: 600; }
 .navActive .navIcon { opacity: 1; }
 
 .sidebarFooter { flex: none; margin-top: 2px; padding: 12px; border-top: 1px solid var(--border); }
@@ -247,8 +247,8 @@
 
 @media (min-width: 880px) and (max-width: 1439px) {
   .header:has([data-header-page-tabs]) .headerActions { gap: 4px; }
-  .header:has([data-header-page-tabs]) .headerActions [aria-label="Account menu"] { width: 38px; padding: 3px; }
-  .header:has([data-header-page-tabs]) .headerActions [aria-label="Account menu"] > span:last-child { display: none; }
+  .header:has([data-header-page-tabs]) .headerActions [aria-label^="Account menu"] { width: 38px; padding: 3px; }
+  .header:has([data-header-page-tabs]) .headerActions [aria-label^="Account menu"] > span:last-child { display: none; }
 }
 
 @media (max-width: 879px) {

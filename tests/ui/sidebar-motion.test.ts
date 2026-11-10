@@ -19,7 +19,7 @@ describe('original static sidebar rail', () => {
     const css = read('src/components/app-shell.module.css');
     const globals = read('src/app/globals.css');
     expect(css).toMatch(/\.railLine\s*\{[^}]*width:\s*1px[^}]*background:\s*var\(--border\)/);
-    expect(css).toMatch(/\.navActive,\s*\.navActive:hover\s*\{[^}]*color:\s*var\(--workspace-accent\)[^}]*background:\s*var\(--workspace-accent-weak\)/);
+    expect(css).toMatch(/\.navActive,\s*\.navActive:hover\s*\{[^}]*color:\s*color-mix\(in srgb, var\(--workspace-accent\) 90%, var\(--text\)\)[^}]*background:\s*var\(--workspace-accent-weak\)/);
     expect(css).toMatch(/\.navLink\s*\{[^}]*border-radius:\s*8px/);
     expect(css).not.toContain('sidebar-strand');
     expect(css).not.toContain('sidebar-items-reveal');

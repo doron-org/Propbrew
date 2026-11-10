@@ -19,7 +19,7 @@ export function RoleSwitcher({ currentKey }: { currentKey: string }) {
 
   return (
     <label className="block mb-2">
-      <span className="flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.08em] text-text-3 mb-1 px-1">
+      <span className="flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.08em] text-text-2 mb-1 px-1">
         <span className="w-1.5 h-1.5 rounded-full bg-warning animate-[tms-pulse_2s_ease-in-out_infinite]" />
         Dev · viewing as
       </span>

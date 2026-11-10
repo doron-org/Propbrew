@@ -12,7 +12,7 @@ async function assertDemoChoices(page: Page) {
   await expect(page.getByRole('heading', { name: 'Explore a demo', exact: true })).toBeVisible();
   const chooser = page.getByRole('form', { name: 'Demo workspaces', exact: true });
   await expect(chooser).toBeVisible();
-  for (const workspace of workspaces) await expect(chooser.getByRole('button', { name: `Explore ${workspace.name} demo`, exact: true })).toBeVisible();
+  for (const workspace of workspaces) await expect(chooser.getByRole('button', { name: new RegExp(`Explore demo:.*${workspace.name}`) })).toBeVisible();
   await expect(page.getByText('Add, edit and try workflows with sample data. Your changes stay in your own sandbox. No sign-up required.', { exact: true })).toBeVisible();
 }
 
@@ -72,7 +72,7 @@ for (const workspace of workspaces) {
   test(`public ${workspace.name} demo opens an editable private sandbox and exits cleanly`, async ({ page }) => {
     await page.goto(workspace.entry);
     await assertDemoChoices(page);
-    await page.getByRole('button', { name: `Explore ${workspace.name} demo`, exact: true }).click();
+    await page.getByRole('button', { name: new RegExp(`Explore demo:.*${workspace.name}`) }).click();
     await expect(page).toHaveURL(new RegExp(`/${workspace.module}$`));
     await expect(page.getByRole('navigation', { name: `${workspace.name} navigation`, exact: true })).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'Demo account notice', exact: true })).toHaveCount(0);
@@ -113,7 +113,7 @@ for (const workspace of workspaces) {
       await expect(page.getByRole('button', { name: 'New project', exact: true })).toBeEnabled();
     }
 
-    const accountMenu = page.getByRole('button', { name: 'Account menu', exact: true });
+    const accountMenu = page.getByRole('button', { name: /^Account menu — / });
     await accountMenu.click();
     const menuId = await accountMenu.getAttribute('aria-controls');
     expect(menuId).toBeTruthy();

@@ -61,7 +61,7 @@ export function ControlCenter({ health, systems, sensors, alarms, kpis, nowMs, c
     <Card className={styles.panel}>
       <CardHeader title="Building operations" subtitle={'Recorded snapshot · ' + date(new Date(nowMs).toISOString()) + ' · not a connected live sensor feed'} action={<StatusPill status={health.label} tone={health.band} />} />
       <div className={styles.summary}>
-        <div className={styles.ring} aria-label={'Rules-based system health ' + health.score + ' out of 100'}>
+        <div className={styles.ring} role="meter" aria-label="Rules-based system health" aria-valuemin={0} aria-valuemax={100} aria-valuenow={health.score}>
           <svg width={96} height={96} viewBox="0 0 36 36" className="-rotate-90" aria-hidden="true"><circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--border)" strokeWidth="3" /><circle cx="18" cy="18" r="15.5" fill="none" stroke={toneVar(health.band)} strokeWidth="3" strokeLinecap="round" strokeDasharray={String(Math.max(0, Math.min(100, health.score)) * .974) + ' 97.4'} /></svg>
           <span className={styles.ringLabel}><strong>{health.score}</strong><small>/ 100</small></span>
         </div>

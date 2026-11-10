@@ -36,7 +36,7 @@ export function ProfileMenu({ name, roleSummary, tenantLabel, workspace, company
           ref={trigger}
           type="button"
           onClick={toggle}
-          aria-label="Account menu"
+          aria-label={`Account menu — ${name.split(' ')[0]}`}
           aria-expanded={open}
           aria-controls={panelId}
           className="flex items-center gap-2.5 h-[38px] pl-[3px] pr-3 border border-border rounded-[20px] bg-surface hover:bg-surface-2 transition-colors max-[560px]:pr-1.5"

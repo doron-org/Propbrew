@@ -3,7 +3,7 @@ import { openDialog, selectTab } from './dialog';
 
 async function enterDemo(page: Page, workspace: 'Estate' | 'Facility') {
   await page.goto('/login');
-  await page.getByRole('button', { name: `Explore ${workspace} demo`, exact: true }).click();
+  await page.getByRole('button', { name: new RegExp(`Explore demo:.*${workspace}`) }).click();
   await expect(page).toHaveURL(new RegExp(`/${workspace.toLowerCase()}$`));
   await expect(page.getByRole('complementary', { name: 'Demo account notice', exact: true })).toHaveCount(0);
 }

@@ -16,7 +16,13 @@ const root = process.cwd();
 const directory = await mkdtemp(join(process.platform === 'darwin' ? '/tmp' : tmpdir(), 'propbrew-company-browser-'));
 const data = join(directory, 'pg');
 const app = join(directory, 'app');
-const safeEnv = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP', 'LANG', 'LC_ALL', 'CI', 'PLAYWRIGHT_BROWSERS_PATH'].filter((key) => process.env[key] !== undefined).map((key) => [key, process.env[key]]));
+// initdb uses --no-locale; do not pass an unsupported inherited locale to the
+// PostgreSQL child (macOS otherwise aborts with a multithreaded-startup error).
+const safeEnv = {
+  ...Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP', 'CI', 'PLAYWRIGHT_BROWSERS_PATH'].filter((key) => process.env[key] !== undefined).map((key) => [key, process.env[key]])),
+  LANG: 'C',
+  LC_ALL: 'C',
+};
 function program(name) {
   const homebrew = `/opt/homebrew/bin/${name}`;
   if (process.platform === 'darwin' && existsSync(homebrew)) return homebrew;
@@ -75,7 +81,7 @@ try {
   const tlsPort = production ? await freePort() : 0;
   const origin = production ? `https://127.0.0.1:${tlsPort}` : `http://127.0.0.1:${appPort}`;
   const env = {
-    ...safeEnv, NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1',
+    ...safeEnv, NODE_ENV: production ? 'production' : 'development', NEXT_TELEMETRY_DISABLED: '1',
     DATABASE_URL: `postgresql://propbrew_review_app@127.0.0.1:${pgPort}/postgres`,
     DATA_SOURCE: 'postgres', PROPBREW_AUTH_MODE: 'company', PROPBREW_REVIEW_MODE: '0', PROPBREW_WEBSITE_ONLY: '0',
     PROPBREW_DEMO_ACCOUNTS: '1', PROPBREW_DEMO_PASSWORD: demoPassword,
@@ -119,8 +125,12 @@ try {
   if (!ready) throw new Error('The disposable native-account app did not become ready.');
   await run(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', '--config', 'playwright.company-auth.config.ts', ...process.argv.slice(2)], { cwd: root, visible: true, env: { ...safeEnv, PW_COMPANY_BASE_URL: origin } });
 } catch (error) {
-  const log = await readFile(join(directory, 'next.log'), 'utf8').catch(() => '');
-  if (log) console.error(log.slice(-6000));
+  // Database startup can fail before the Next.js log exists. Surface both logs
+  // so a disposable-browser failure is diagnosable rather than a bare pg_ctl exit.
+  for (const name of ['postgres.log', 'next.log']) {
+    const log = await readFile(join(directory, name), 'utf8').catch(() => '');
+    if (log) console.error(`${name}:\n${log.slice(-6000)}`);
+  }
   throw error;
 } finally {
   tls?.close();

@@ -75,8 +75,13 @@ describe('company account and access presentation', () => {
       expect(html).toContain('Explore a demo'); expect(html).toContain('Private sandbox');
       expect(html).toContain('sample data'); expect(html).toContain('No sign-up required');
       expect(html).toContain('Add, edit and try workflows'); expect(html).toContain('Your changes stay in your own sandbox');
-      for (const workspace of ['Estate', 'Facility', 'Shortlet', 'Construction']) expect(html).toContain(`aria-label="Explore ${workspace} demo"`);
-      expect([...html.matchAll(/<button[^>]+>/g)].map(([tag]) => tag).filter((tag) => tag.includes('name="module"')).map((tag) => /value="([^"]+)"/.exec(tag)?.[1])).toEqual(['estate', 'facility', 'shortlet', 'construction']);
+      for (const [workspace, detail] of [['Estate', 'People & properties'], ['Facility', 'Assets & maintenance'], ['Shortlet', 'Guests & stays'], ['Construction', 'Projects & delivery']]) {
+        expect(html).toContain(`<strong>${workspace}</strong><span>${detail.replace('&', '&amp;')}</span>`);
+      }
+      const demoButtons = [...html.matchAll(/<button[^>]+>/g)].map(([tag]) => tag).filter((tag) => tag.includes('name="module"'));
+      expect(demoButtons.every((tag) => !tag.includes('aria-label'))).toBe(true);
+      expect(html.match(/>Explore demo: </g)).toHaveLength(4);
+      expect(demoButtons.map((tag) => /value="([^"]+)"/.exec(tag)?.[1])).toEqual(['estate', 'facility', 'shortlet', 'construction']);
       expect(html).not.toContain('@example.invalid'); expect(html).not.toContain('value="demo');
     }
     expect(renderToStaticMarkup(createElement(AccountForm, { mode: 'login', action }))).not.toContain('Explore a demo');

@@ -72,7 +72,7 @@ export default async function WorkspacesPage({ searchParams }: { searchParams: P
                 <ul className={styles.highlights}>{workspace.highlights.map((point) => <li key={point}><Check size={13} aria-hidden="true" /><span>{point}</span></li>)}</ul>
                 <div className={styles.features}>{workspace.features.map((feature) => <span key={feature}>{feature}</span>)}</div>
                 <div className={styles.cardFooter}>
-                  {allowed ? <Link href={workspace.home} className={styles.enter} aria-label={`Enter ${workspace.name} workspace`}>Enter workspace<ArrowRight size={14} aria-hidden="true" /></Link>
+                  {allowed ? <Link href={workspace.home} className={styles.enter}>Enter {workspace.name} workspace<ArrowRight size={14} aria-hidden="true" /></Link>
                     : <span className={styles.locked}><LockKeyhole size={12} aria-hidden="true" />Requires a different assigned role</span>}
                 </div>
               </section>
