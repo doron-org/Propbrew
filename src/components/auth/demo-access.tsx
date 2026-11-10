@@ -24,7 +24,8 @@ export function DemoAccess({ disabled = false }: { disabled?: boolean }) {
     <p id={`${prefix}-description`} className={styles.description}>Add, edit and try workflows with sample data. Your changes stay in your own sandbox. No sign-up required.</p>
     <form action={action} aria-label="Demo workspaces" aria-busy={pending}>
       <fieldset className={styles.grid} disabled={disabled || pending}><legend className="sr-only">Choose a demo workspace</legend>
-        {WORKSPACES.map(({ id, name, detail, icon: Icon }) => <button key={id} type="submit" name="module" value={id} className={styles.workspace} aria-label={`Explore ${name} demo`} onClick={() => setSelected(id)}>
+        {WORKSPACES.map(({ id, name, detail, icon: Icon }) => <button key={id} type="submit" name="module" value={id} className={styles.workspace} onClick={() => setSelected(id)}>
+          <span className="sr-only">Explore demo: </span>
           <Icon size={17} aria-hidden="true" className={styles.icon} />
           <span className={styles.label}><strong>{pending && selected === id ? `Opening ${name}…` : name}</strong><span>{detail}</span></span>
           {pending && selected === id ? <LoaderCircle size={14} className={styles.spinner} aria-hidden="true" /> : <ArrowUpRight size={14} className={styles.arrow} aria-hidden="true" />}

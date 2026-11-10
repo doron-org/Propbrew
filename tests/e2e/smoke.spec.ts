@@ -96,7 +96,7 @@ for (const workspace of ['Estate', 'Facility', 'Shortlet', 'Construction']) {
     for (const other of ['Estate', 'Facility', 'Shortlet', 'Construction'].filter((name) => name !== workspace)) {
       await expect(page.getByRole('navigation', { name: `${other} navigation`, exact: true })).toHaveCount(0);
     }
-    await page.getByRole('button', { name: 'Account menu', exact: true }).click();
+    await page.getByRole('button', { name: /^Account menu — / }).click();
     await page.getByRole('link', { name: `Switch workspace, current ${workspace}`, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/workspaces\\?from=${id}$`));
     await expect(page.getByRole('heading', { name: 'Choose your workspace', exact: true })).toBeVisible();

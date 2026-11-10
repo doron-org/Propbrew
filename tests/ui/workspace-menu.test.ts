@@ -54,7 +54,7 @@ describe('workspace controls relocated into the account menu', () => {
   it('retains account identity and sign out with or without a workspace', () => {
     for (const workspace of [undefined, WORKSPACES[0]]) {
       const html = render(workspace);
-      expect(html).toContain('aria-label="Account menu"');
+      expect(html).toContain('aria-label="Account menu — Ada"');
       expect(html).toContain(identity.name);
       expect(html).toContain(identity.roleSummary);
       expect(html).toContain(identity.tenantLabel);

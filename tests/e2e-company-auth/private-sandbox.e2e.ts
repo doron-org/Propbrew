@@ -4,7 +4,7 @@ import { openDialog } from './dialog';
 
 async function enterEstate(page: Page) {
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Explore Estate demo', exact: true }).click();
+  await page.getByRole('button', { name: /Explore demo:.*Estate/ }).click();
   await expect(page).toHaveURL(/\/estate$/);
   await expect(page.getByRole('complementary', { name: 'Demo account notice' })).toHaveCount(0);
 }
@@ -62,7 +62,7 @@ test('two visitors using the same demo login keep independent edits isolated fro
 
 test('private construction sandbox mobilises a project through WBS, programme, BOQ, team and lifecycle controls', async ({ page }) => {
   const id = randomUUID().slice(0, 8), name = `Sandbox build ${id}`, updated = `${name} edited`;
-  await page.goto('/login'); await page.getByRole('button', { name: 'Explore Construction demo', exact: true }).click();
+  await page.goto('/login'); await page.getByRole('button', { name: /Explore demo:.*Construction/ }).click();
   await expect(page).toHaveURL(/\/construction$/); await page.goto('/construction/projects');
   const create = page.getByRole('dialog', { name: 'New project', exact: true });
   await openDialog(page.getByRole('button', { name: 'New project', exact: true }), create);

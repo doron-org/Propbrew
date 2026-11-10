@@ -83,7 +83,26 @@ jobs:
         run: npm run test:e2e
 
       - name: Build
-        run: npx next build
+        run: npx next build --webpack
+        env:
+          NEXT_PUBLIC_DEV_IDENTITY: '0'
+          NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3106
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ''
+          PROPBREW_AUTH_MODE: clerk
+          DATA_SOURCE: memory
+          REEVE_ALLOW_DEMO_IDENTITIES: '0'
+          REEVE_ALLOW_IN_MEMORY_DATA: '0'
+          CLERK_SECRET_KEY: ''
+          OPENAI_API_KEY: ''
+          ANTHROPIC_API_KEY: ''
+          BLOB_READ_WRITE_TOKEN: ''
+
+      # Runs against the production bundle, not a development compilation.
+      - name: Production shell and dialog accessibility (axe)
+        run: npm run test:a11y
+
+      - name: Company account accessibility (axe)
+        run: npm run test:a11y:company
 
       - name: Migration presence
         run: test -s db/migrations/001_production_foundation.sql && test -s db/migrations/002_ng_pilot.sql && test -s db/migrations/003_domain_rows.sql && test -s db/migrations/004_operations_ai_comms.sql

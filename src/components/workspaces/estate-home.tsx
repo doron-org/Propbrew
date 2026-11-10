@@ -278,8 +278,8 @@ function CollectionChart({ months, currency }: { months: ReturnType<typeof build
   const ceiling = max * 1.12;
   return <figure>
     <div className={styles.legend} aria-hidden="true"><span><i style={{ background: 'var(--border-2)' }} />Billed</span><span><i style={{ background: 'var(--primary)' }} />Collected</span></div>
-    <svg className={styles.chart} viewBox="0 0 640 260" role="img" aria-labelledby="collection-chart-title collection-chart-description">
-      <title id="collection-chart-title">Billed and collected charges by invoice due month</title><desc id="collection-chart-description">{`${months.map((month) => `${month.label}: billed ${money(month.billedMinor, currency)}, collected ${money(month.collectedMinor, currency)}`).join('; ')}. Invoice due dates are not payment receipt dates.`}</desc>
+    <svg className={styles.chart} viewBox="0 0 640 260" role="img">
+      <title>Billed and collected charges by invoice due month</title><desc>{`${months.map((month) => `${month.label}: billed ${money(month.billedMinor, currency)}, collected ${money(month.collectedMinor, currency)}`).join('; ')}. Invoice due dates are not payment receipt dates.`}</desc>
       {[0, 1, 2, 3].map((step) => <g key={step}><line x1="83" x2="630" y1={220 - step * 65} y2={220 - step * 65} stroke="var(--border)" strokeDasharray="3 4" /><text x="73" y={224 - step * 65} textAnchor="end" fontSize="10" fill="var(--text-2)">{money(ceiling * step / 3, currency, true)}</text></g>)}
       {months.map((month, index) => {
         const x = 110 + index * 89;

@@ -36,7 +36,7 @@ export function MessagesMenu({ threads, unread, readOnly = false }: { threads: T
         <IconButton title="Messages" aria-label={`Messages${unread ? `, ${unread} unread` : ''}`} onClick={() => { setActiveId(null); toggle(); }}>
           <MessageSquare size={17} />
           {unread > 0 && (
-            <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-lg bg-[#ef4444] text-white text-[10px] font-bold flex items-center justify-center border-2 border-surface">
+            <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-lg bg-[#b91c1c] text-white text-[10px] font-bold flex items-center justify-center border-2 border-surface">
               {unread}
             </span>
           )}
