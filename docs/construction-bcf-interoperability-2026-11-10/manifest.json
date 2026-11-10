@@ -1,0 +1,23 @@
+{
+  "generatedAtISO": "2026-11-10T10:20:00.225Z",
+  "standard": "BCF-XML 3.0",
+  "generator": "Propbrew createBcfZip",
+  "evidenceClass": "Synthetic interoperability fixture — not consultant or authoring-tool acceptance",
+  "archive": "propbrew-coordination.bcf",
+  "bytes": 1854,
+  "sha256": "ac486d87e06a1f5fda70db7a16777a56d13cac1ad07bb492f99e35f2d9eb0213",
+  "projectGuid": "12345678-1234-4234-8234-123456789abc",
+  "topicGuid": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "viewpointGuid": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  "commentGuid": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  "componentIds": [
+    "0sfBnoLAb0R9H9P$iaZWyE"
+  ],
+  "files": [
+    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/coordination.bcfv",
+    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/coordination.png",
+    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/markup.bcf",
+    "bcf.version",
+    "project.bcfp"
+  ]
+}
