@@ -7,7 +7,7 @@ import { AppShell, type ShellIdentity } from '@/components/app-shell';
 import { RoleSwitcher } from '@/components/dev/role-switcher';
 import { getOwnerIdentity } from '@/server/onboarding/identity';
 import { requireOperatorSession } from '@/server/workspaces';
-import { canEnterWorkspace, workspaceById, type WorkspaceId } from '@/config/workspaces';
+import { canEnterWorkspace, propertyManagementWorkspace, workspaceById, type WorkspaceId } from '@/config/workspaces';
 import { can } from '@/lib/authz';
 import { withDurableRead } from '@/server/data/durable-records';
 import { canManageCompanyMembers } from '@/lib/auth/company-policy';
@@ -24,7 +24,7 @@ function firstReadable(actor: Actor, capabilities: readonly Capability[]): Capab
 
 /** Property-first Estate rail: property accordion → compact workflow accordions. */
 function propertyNavigation(actor: Actor): NavGroup[] {
-  if (!can(actor, 'assets_ppm', 'read').allowed) return [];
+  if (!canEnterWorkspace(actor, 'estate') || !can(actor, 'assets_ppm', 'read').allowed) return [];
   const sites = repos.sites?.all?.(actor)?.map(({ id, name, kind }) => ({ id: String(id), name, kind })) ?? [];
 
   const sectionCapabilities = {
@@ -66,6 +66,15 @@ function propertyNavigation(actor: Actor): NavGroup[] {
     can(actor, 'reports_analytics', 'read').allowed ? { id: `property-${siteId}-copilot`, label: 'Ask Copilot', href: scopedHref('/estate/copilot', siteId), icon: 'sparkles' as const, capability: 'reports_analytics' as const } : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
 
+  const facilityItems = (siteId: string, section: 'asset-care' | 'building-services'): NavItem[] => {
+    const hub = `/facility/sites/${encodeURIComponent(siteId)}`;
+    const link = (href: string) => scopedWorkspaceHref(href, 'siteId', siteId, hub);
+    const entries: Array<[string, string, string, NavItem['icon'], Capability]> = section === 'asset-care'
+      ? [['assets', 'Asset register', '/assets', 'boxes', 'assets_ppm'], ['ppm', 'Maintenance plans', '/ppm', 'calendar', 'assets_ppm'], ['facility-inspections', 'Facility inspections', '/inspections', 'clipboard', 'inspections_compliance'], ['inventory', 'Inventory', '/inventory', 'package', 'assets_ppm']]
+      : [['energy', 'Energy & utilities', '/energy', 'trending', 'assets_ppm'], ['safety', 'Safety & permits', '/safety', 'shield', 'assets_ppm'], ['access', 'Access & visitors', '/access', 'users', 'assets_ppm'], ['contracts', 'Contracts & SLAs', '/contracts', 'scroll', 'assets_ppm']];
+    return entries.filter(([, , , , capability]) => can(actor, capability, 'read').allowed).map(([id, label, href, icon, capability]) => ({ id: `property-${siteId}-${id}`, label, href: link(href), icon, capability }));
+  };
+
   return sites.filter((site) => site.kind === 'estate')
     .sort((a, b) => a.name.localeCompare(b.name, 'en-NG', { numeric: true }))
     .map((site) => ({
@@ -74,6 +83,8 @@ function propertyNavigation(actor: Actor): NavGroup[] {
       items: [
         { id: `property-${site.id}-dashboard`, label: 'Dashboard', href: `/properties/${encodeURIComponent(site.id)}`, icon: 'gauge' as const, capability: 'assets_ppm' as const },
         sectionCapabilities.operations ? { id: `property-${site.id}-operations`, label: 'Operations', href: `/properties/${encodeURIComponent(site.id)}/operations`, icon: 'wrench' as const, capability: sectionCapabilities.operations, children: operationItems(site.id) } : null,
+        canEnterWorkspace(actor, 'facility') ? { id: `property-${site.id}-asset-care`, label: 'Asset care', href: `/facility/sites/${encodeURIComponent(site.id)}/asset-care`, icon: 'boxes' as const, capability: 'assets_ppm' as const, children: facilityItems(site.id, 'asset-care') } : null,
+        canEnterWorkspace(actor, 'facility') ? { id: `property-${site.id}-building-services`, label: 'Building services', href: `/facility/sites/${encodeURIComponent(site.id)}/building-services`, icon: 'building' as const, capability: 'assets_ppm' as const, children: facilityItems(site.id, 'building-services') } : null,
         sectionCapabilities.community ? { id: `property-${site.id}-community`, label: 'Community & governance', href: `/properties/${encodeURIComponent(site.id)}/community-governance`, icon: 'users' as const, capability: sectionCapabilities.community, children: communityItems(site.id) } : null,
         sectionCapabilities.finance ? { id: `property-${site.id}-finance`, label: 'Finance & commerce', href: `/properties/${encodeURIComponent(site.id)}/finance-commerce`, icon: 'banknote' as const, capability: sectionCapabilities.finance, children: financeItems(site.id) } : null,
         sectionCapabilities.intelligence ? { id: `property-${site.id}-intelligence`, label: 'Intelligence', href: `/properties/${encodeURIComponent(site.id)}/intelligence`, icon: 'sparkles' as const, capability: sectionCapabilities.intelligence, children: intelligenceItems(site.id) } : null,
@@ -135,15 +146,15 @@ function constructionProjectNavigation(actor: Actor): NavGroup[] {
 
 /** Facility sites follow the same asset-first operating model as Estate. */
 function facilitySiteNavigation(actor: Actor): NavGroup[] {
-  if (!can(actor, 'assets_ppm', 'read').allowed) return [];
-  const sites = (repos.sites?.all?.(actor) ?? []).filter((site) => site.kind === 'facility')
+  if (!canEnterWorkspace(actor, 'facility') || !can(actor, 'assets_ppm', 'read').allowed) return [];
+  const sites = (repos.sites?.all?.(actor) ?? []).filter((site) => site.kind === 'facility' || (site.kind === 'estate' && !canEnterWorkspace(actor, 'estate')))
     .slice().sort((a, b) => a.name.localeCompare(b.name, 'en-NG', { numeric: true }));
   return sites.map((site) => {
     const siteId = String(site.id);
     const hub = `/facility/sites/${encodeURIComponent(siteId)}`;
     const link = (href: string) => scopedWorkspaceHref(href, 'siteId', siteId, hub);
     const entry = (id: string, label: string, href: string, icon: NavItem['icon'], capability: Capability = 'assets_ppm'): NavItem => ({ id: `facility-${siteId}-${id}`, label, href: link(href), icon, capability });
-    return { label: site.name, collapsible: true, items: [
+    return { label: `${site.name} · Facilities`, collapsible: true, items: [
       { id: `facility-${siteId}-dashboard`, label: 'Site dashboard', href: hub, icon: 'gauge', capability: 'assets_ppm' },
       { id: `facility-${siteId}-operations`, label: 'Operations', href: `${hub}/operations`, icon: 'wrench', capability: 'work_orders', children: [entry('work-orders', 'Work orders', '/work-orders', 'wrench', 'work_orders'), entry('field', 'Mobile jobs', '/field', 'checks', 'work_orders'), entry('vendors', 'Vendors & contractors', '/vendors', 'truck', 'work_orders')] },
       { id: `facility-${siteId}-asset-care`, label: 'Asset care', href: `${hub}/asset-care`, icon: 'boxes', capability: 'assets_ppm', children: [entry('assets', 'Asset register', '/assets', 'boxes'), entry('ppm', 'Maintenance plans', '/ppm', 'calendar'), entry('inspections', 'Inspections & compliance', '/inspections', 'clipboard', 'inspections_compliance'), entry('inventory', 'Inventory', '/inventory', 'package')] },
@@ -195,30 +206,25 @@ export async function ShellFrame({ expected, workspace, children }: { expected: 
   if (expected === 'ops' && (!workspace || !canEnterWorkspace(actor, workspace))) notFound();
 
   let groups = visibleNav(shell, actor, workspace);
-  if (workspace === 'estate') {
-    const overview = groups.find((group) => group.label === 'Overview');
-    const portfolio = groups.find((group) => group.label === 'Property portfolio');
+  if (workspace === 'estate' || workspace === 'facility') {
+    const propertyWorkspace = propertyManagementWorkspace(actor);
+    const homeCapability = firstReadable(actor, ['assets_ppm', 'work_orders', 'announcements', 'charges_invoicing', 'security_sos']);
+    const portfolio = canEnterWorkspace(actor, 'estate') ? visibleNav(shell, actor, 'estate').find((group) => group.label === 'Property portfolio') : undefined;
     groups = [
-      ...(overview || portfolio ? [{
-        label: 'Estate overview',
+      ...(propertyWorkspace && homeCapability ? [{
+        label: 'Property management',
         items: [
-          ...(overview?.items ?? []),
-          ...(portfolio?.items.map((item) => ({ ...item, label: 'All properties' })) ?? []),
+          { id: 'property-management-home', label: 'Overview', href: propertyWorkspace.home, icon: 'gauge' as const, capability: homeCapability },
+          ...(portfolio?.items.map((item) => ({ ...item, label: 'All estate properties' })) ?? []),
         ],
       }] : []),
-      ...propertyNavigation(actor),
+      ...[...propertyNavigation(actor), ...facilitySiteNavigation(actor)].sort((a, b) => a.label.localeCompare(b.label, 'en-NG', { numeric: true })),
     ];
   } else if (workspace === 'construction') {
     const overview = groups.find((group) => group.label === 'Construction overview');
     groups = [
       ...(overview ? [{ label: 'Construction overview', items: overview.items.map((item) => item.id === 'con-projects' ? { ...item, label: 'All projects' } : item) }] : []),
       ...constructionProjectNavigation(actor),
-    ];
-  } else if (workspace === 'facility') {
-    const overview = groups.find((group) => group.label === 'Overview');
-    groups = [
-      ...(overview ? [{ label: 'Facility overview', items: overview.items }] : []),
-      ...facilitySiteNavigation(actor),
     ];
   } else if (workspace === 'shortlet') {
     const overview = groups.find((group) => group.label === 'Shortlet overview');
@@ -257,7 +263,7 @@ export async function ShellFrame({ expected, workspace, children }: { expected: 
   return (
     <AppShell
       groups={groups}
-      workspace={workspaceById(workspace)}
+      workspace={workspace === 'estate' || workspace === 'facility' ? propertyManagementWorkspace(actor) : workspaceById(workspace)}
       identity={identity}
       notifications={notifications}
       unreadNotifications={unreadNotifications}

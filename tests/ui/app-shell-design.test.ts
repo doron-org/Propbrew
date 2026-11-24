@@ -162,11 +162,11 @@ describe('Clinexa-adapted Propbrew application shell', () => {
     const profile = readFileSync(new URL('../../src/components/inbox/profile-menu.tsx', import.meta.url), 'utf8');
     expect(shell).toContain('demoPersonaId={identity.demoPersonaId}');
     expect(profile).toContain('aria-label="Switch demo user type"');
-    for (const workspace of ['Estate', 'Facility', 'Shortlet', 'Construction']) {
+    for (const workspace of ['Property Management', 'Shortlet', 'Construction']) {
       expect(profile).toContain(`label="${workspace} user types"`);
     }
-    expect(profile).toContain("workspacePersonas('estate').map");
-    expect(profile).toContain("workspacePersonas('facility').map");
+    expect(profile).toContain("...workspacePersonas('estate')");
+    expect(profile).toContain("...workspacePersonas('facility')");
     expect(profile).toContain("workspacePersonas('shortlet').map");
     expect(profile).toContain("workspacePersonas('construction').map");
   });

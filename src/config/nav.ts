@@ -375,6 +375,7 @@ export function visibleNav(shell: Shell, actor: Actor, workspace?: WorkspaceId):
 
 /** Page title + subtitle per route. */
 export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
+  '/property-management': { title: 'Property Management', subtitle: 'Estate and facility operations in one portfolio' },
   '/estate': { title: 'Estate overview', subtitle: 'Residents, community and collections in one workspace' },
   '/estate/work-orders': { title: 'Estate work orders', subtitle: 'Requests, assignments and resolution within Estate' },
   '/estate/inspections': { title: 'Estate inspections', subtitle: 'Estate compliance obligations and inspection evidence' },

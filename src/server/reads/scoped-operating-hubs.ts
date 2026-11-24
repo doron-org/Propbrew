@@ -44,7 +44,9 @@ export function readConstructionProjectHub(actor: Actor, projectId: string) {
 }
 
 export function readFacilitySiteHub(actor: Actor, siteId: string) {
-  const site = repos.sites.all(actor).find((item) => String(item.id) === siteId && item.kind === 'facility');
+  // Facility teams may operate assets at an estate property as well as at a
+  // standalone facility site. The route still requires the Facility grant.
+  const site = repos.sites.all(actor).find((item) => String(item.id) === siteId && (item.kind === 'facility' || item.kind === 'estate'));
   if (!site) return null;
   const hub = `/facility/sites/${encodeURIComponent(siteId)}`;
   const link = (href: string) => scoped(href, 'siteId', siteId, hub);

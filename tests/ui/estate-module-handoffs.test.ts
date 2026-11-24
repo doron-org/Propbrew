@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import type { Notification } from '@/server/data/inbox';
 import type { WorkspaceId } from '@/config/workspaces';
+import type { NavGroup } from '@/config/nav';
 import { identityByKey } from '@/server/identities';
 
 const boundary = vi.hoisted(() => ({
@@ -13,7 +14,7 @@ const boundary = vi.hoisted(() => ({
   sosEvents: vi.fn(() => ({ items: [], total: 0, cursor: null })),
   vendors: vi.fn(() => ({ items: [], total: 0, cursor: null })),
   residents: vi.fn(() => ({ items: [], total: 0, cursor: null })),
-  sites: vi.fn(() => []),
+  sites: vi.fn<() => Array<{ id: string; name: string; kind: string }>>(() => []),
 }));
 
 vi.mock('@/server/session', () => ({ getActor: boundary.getActor, getSession: boundary.getSession, devIdentityEnabled: () => false }));
@@ -54,7 +55,7 @@ function actAs(key = 'estate_manager') {
 
 async function frameNotifications(workspace: WorkspaceId) {
   const frame = await ShellFrame({ expected: 'ops', workspace, children: null });
-  return (frame as ReactElement<{ notifications: Notification[]; unreadNotifications: number }>).props;
+  return (frame as ReactElement<{ notifications: Notification[]; unreadNotifications: number; groups: NavGroup[]; workspace: { home: string; name: string } }>).props;
 }
 
 beforeEach(() => {
@@ -64,6 +65,18 @@ beforeEach(() => {
 });
 
 describe('Estate notification navigation context', () => {
+  it('places estate properties and facility sites in the same Property Management rail', async () => {
+    boundary.sites.mockReturnValue([
+      { id: 'estate-1', name: 'Lagos Gardens', kind: 'estate' },
+      { id: 'facility-1', name: 'Tower Plant', kind: 'facility' },
+    ]);
+    const { groups, workspace } = await frameNotifications('estate');
+    expect(workspace).toMatchObject({ home: '/property-management', name: 'Property Management' });
+    expect(groups.map((group) => group.label)).toEqual(['Property management', 'Lagos Gardens', 'Tower Plant · Facilities']);
+    expect(groups[1].items.map((item) => item.label)).toContain('Asset care');
+    expect(groups[2].items.map((item) => item.label)).toContain('Building services');
+  });
+
   it.each([
     ['/work-orders', '/estate/work-orders'],
     ['/work-orders/WO-24817', '/estate/work-orders/WO-24817'],

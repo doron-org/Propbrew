@@ -18,7 +18,7 @@ export default async function ReviewLoginPage({ searchParams }: { searchParams: 
         <span className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white"><LockKeyhole size={21} aria-hidden="true" /></span>
         <p className="text-[12px] font-semibold text-primary">Propbrew · Private review</p>
         <h1 id="review-title" className="mt-2 text-[26px] font-semibold tracking-tight">Enter the review workspace</h1>
-        <p className="mt-3 text-sm leading-relaxed text-text-2">Use the password shared with you to explore the four workspaces and their AI Copilots with sample records.</p>
+        <p className="mt-3 text-sm leading-relaxed text-text-2">Use the password shared with you to explore Property Management, Shortlet and Construction with sample records and AI Copilots.</p>
         <form method="post" action="/review/login/auth" className="mt-6">
           <input type="hidden" name="csrf" value={csrf} />
           <label htmlFor="review-password" className="pb-form-label">Review password</label>

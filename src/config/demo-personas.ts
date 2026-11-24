@@ -34,7 +34,7 @@ const DEMO_VENDOR = 'v-brightworks';
  * They never create accounts, change a real membership or cross tenant scope. */
 export const DEMO_PERSONAS: readonly DemoPersona[] = Object.freeze([
   Object.freeze({
-    id: 'company-owner', label: 'Company owner', description: 'Full sandbox access across all four modules', home: '/workspaces',
+    id: 'company-owner', label: 'Company owner', description: 'Full sandbox access across all three workspaces', home: '/workspaces',
     roles: Object.freeze(['estate_manager', 'facility_manager', 'technician', 'security'] as const), modules: ALL_MANAGE,
   }),
   Object.freeze({

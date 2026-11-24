@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowRight, Check, LayoutGrid, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
 import { PropbrewMark } from '@/components/brand/propbrew-logo';
 import { Icon } from '@/components/icon';
-import { WORKSPACES, availableWorkspaces, canEnterWorkspace, workspaceById } from '@/config/workspaces';
+import { WORKSPACES, PROPERTY_MANAGEMENT_CARD, availableWorkspaces, canEnterWorkspace, propertyManagementWorkspace, workspaceById } from '@/config/workspaces';
 import { requireOperatorSession } from '@/server/workspaces';
 import { devIdentityEnabled } from '@/server/session';
 import styles from '@/components/workspaces/workspace-chooser.module.css';
@@ -25,6 +25,7 @@ export default async function WorkspacesPage({ searchParams }: { searchParams: P
   const from = (await searchParams).from;
   const current = workspaceById(typeof from === 'string' ? from : undefined);
   const available = availableWorkspaces(actor);
+  const choices = [propertyManagementWorkspace(actor) ?? PROPERTY_MANAGEMENT_CARD, ...WORKSPACES.filter((workspace) => workspace.id === 'shortlet' || workspace.id === 'construction')];
   const name = session.key === 'clerk' ? session.label : session.label.split(' — ')[0];
   const demo = session.key !== 'clerk' && devIdentityEnabled();
   const principal = currentRecordContext()?.companyPrincipal;
@@ -45,18 +46,19 @@ export default async function WorkspacesPage({ searchParams }: { searchParams: P
         <section className={styles.intro} aria-labelledby="workspace-title">
           <p className={styles.eyebrow}><LayoutGrid size={13} aria-hidden="true" />One account. Focused workspaces.</p>
           <h1 id="workspace-title">Choose your workspace</h1>
-          <p>Different operations deserve different views. Enter the portal built for the work you need to do—each with its own home, navigation, and tools.</p>
+          <p>Run Estate and Facility together in Property Management. Shortlet and Construction have their own focused workspaces.</p>
         </section>
         {showSetup && <section className={styles.setupPrompt} aria-label="Portfolio setup">
           <div><strong>{ownerSetup.version > 0 ? 'Your portfolio setup is saved' : 'Make this company your own'}</strong>
             <p>{ownerSetup.version > 0 ? 'Continue from your last saved step and create your first property and units.' : 'Set up your portfolio and create your first property and units when you are ready.'}</p></div>
           <Link href="/onboarding">{ownerSetup.version > 0 ? 'Resume portfolio setup' : 'Start portfolio setup'}<ArrowRight size={15} aria-hidden="true" /></Link>
         </section>}
-        <p className={styles.accessNote}><ShieldCheck size={14} aria-hidden="true" /><span><strong>{available.length} of 4 workspaces</strong> available to your current role. Your account, organisation, and permissions stay the same.</span></p>
+        <p className={styles.accessNote}><ShieldCheck size={14} aria-hidden="true" /><span><strong>{available.length} of {choices.length} workspaces</strong> available to your current role. Your account, organisation, and permissions stay the same.</span></p>
         <div className={styles.grid}>
-          {WORKSPACES.map((workspace) => {
-            const allowed = canEnterWorkspace(actor, workspace.id);
-            const active = allowed && current?.id === workspace.id;
+          {choices.map((workspace) => {
+            const property = workspace.home === PROPERTY_MANAGEMENT_CARD.home;
+            const allowed = property ? Boolean(propertyManagementWorkspace(actor)) : canEnterWorkspace(actor, workspace.id);
+            const active = allowed && (property ? current?.id === 'estate' || current?.id === 'facility' : current?.id === workspace.id);
             return (
               <section key={workspace.id} className={`${styles.card} ${active ? styles.cardCurrent : ''} ${!allowed ? styles.cardLocked : ''}`}
                 style={{ '--workspace-accent': workspace.accent } as CSSProperties} aria-labelledby={`workspace-${workspace.id}`}>

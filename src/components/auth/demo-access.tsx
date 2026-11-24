@@ -1,13 +1,12 @@
 'use client';
 
 import { useActionState, useEffect, useId, useRef, useState } from 'react';
-import { ArrowUpRight, Building2, Construction, House, LoaderCircle, Wrench } from 'lucide-react';
+import { ArrowUpRight, Building2, Construction, House, LoaderCircle } from 'lucide-react';
 import { enterDemoAccount } from '@/server/actions/demo-auth';
 import styles from './demo-access.module.css';
 
 const WORKSPACES = [
-  { id: 'estate', name: 'Estate', detail: 'People & properties', icon: Building2 },
-  { id: 'facility', name: 'Facility', detail: 'Assets & maintenance', icon: Wrench },
+  { id: 'estate', name: 'Property Management', detail: 'Estate & facility operations', icon: Building2 },
   { id: 'shortlet', name: 'Shortlet', detail: 'Guests & stays', icon: House },
   { id: 'construction', name: 'Construction', detail: 'Projects & delivery', icon: Construction },
 ] as const;

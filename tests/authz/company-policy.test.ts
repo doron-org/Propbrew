@@ -73,7 +73,7 @@ describe('trusted company membership projection', () => {
 
   it.each(['owner', 'admin'] as const)('%s defaults to all four managed portals without platform authority', (companyRole) => {
     const actor = member(undefined, { companyRole, modules: undefined, allEstates: true });
-    expect(availableWorkspaces(actor).map((workspace) => workspace.id)).toEqual(MODULES);
+    expect(availableWorkspaces(actor).map((workspace) => workspace.id)).toEqual(['estate', 'shortlet', 'construction']);
     expect(actor.roles).toEqual(['estate_manager', 'facility_manager']);
     expect(actor.roles).not.toContain('platform_admin');
     expect(canManageCompanyMembers(actor)).toBe(true);
@@ -227,7 +227,7 @@ describe('module isolation and reader ceilings', () => {
   it('preserves legacy role decisions while rejecting unknown module/verb values', () => {
     const { companyAccess: _companyAccess, ...actor } = member({ estate: 'manage' });
     void _companyAccess;
-    expect(availableWorkspaces(actor).map((workspace) => workspace.id)).toEqual(MODULES);
+    expect(availableWorkspaces(actor).map((workspace) => workspace.id)).toEqual(['estate', 'shortlet', 'construction']);
     expect(can(actor, 'charges_invoicing', 'update').allowed).toBe(true);
     expect(canUseCompanyModule(actor, 'not-a-module', 'read')).toBe(false);
     expect(canUseCompanyModule(actor, 'estate', 'delete' as never)).toBe(false);

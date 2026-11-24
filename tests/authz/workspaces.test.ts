@@ -5,6 +5,7 @@ import {
   WORKSPACES,
   availableWorkspaces,
   canEnterWorkspace,
+  propertyManagementWorkspace,
   workspaceById,
   workspaceForPath,
   type WorkspaceId,
@@ -30,6 +31,9 @@ const EXPECTED: Record<Role, WorkspaceId[]> = {
   vendor: [],
   investor: [],
 };
+const PUBLIC_EXPECTED: Record<Role, WorkspaceId[]> = Object.fromEntries(
+  Object.entries(EXPECTED).map(([role, grants]) => [role, grants.filter((id) => id !== 'facility' || !grants.includes('estate'))]),
+) as Record<Role, WorkspaceId[]>;
 
 describe('operator workspace registry', () => {
   it('keeps white workspace button labels at accessible contrast', () => {
@@ -60,7 +64,7 @@ describe('operator workspace registry', () => {
 
   it.each(ROLES)('limits %s to existing operator grants', (role) => {
     const person = actor([role]);
-    expect(availableWorkspaces(person).map((workspace) => workspace.id)).toEqual(EXPECTED[role]);
+    expect(availableWorkspaces(person).map((workspace) => workspace.id)).toEqual(PUBLIC_EXPECTED[role]);
     for (const workspace of WORKSPACES) {
       expect(canEnterWorkspace(person, workspace.id)).toBe(EXPECTED[role].includes(workspace.id));
     }
@@ -80,10 +84,10 @@ describe('operator workspace registry', () => {
 
   it('supports mixed operator roles without granting own-record roles their own operator portal', () => {
     expect(availableWorkspaces(actor(['security', 'technician'])).map((workspace) => workspace.id))
-      .toEqual(['estate', 'facility']);
+      .toEqual(['estate']);
     expect(availableWorkspaces(actor(['resident', 'vendor', 'investor']))).toEqual([]);
     expect(availableWorkspaces(actor(['resident', 'estate_manager'])).map((workspace) => workspace.id))
-      .toEqual(EXPECTED.estate_manager);
+      .toEqual(PUBLIC_EXPECTED.estate_manager);
     expect(availableWorkspaces(actor(['invented-role' as Role]))).toEqual([]);
   });
 
@@ -116,6 +120,15 @@ describe('operator workspace registry', () => {
       expect(originalDecision.scope.estateIds).toEqual(['estate-1']);
       expect(originalDecision.scope.ownership).not.toBeNull();
     }
+  });
+
+  it('shows one property workspace without widening the Estate or Facility grants', () => {
+    const technician = actor(['technician']);
+    const property = propertyManagementWorkspace(technician);
+    expect(property).toMatchObject({ id: 'facility', name: 'Property Management', home: '/property-management' });
+    expect(canEnterWorkspace(technician, 'estate')).toBe(false);
+    expect(canEnterWorkspace(technician, 'facility')).toBe(true);
+    expect(availableWorkspaces(technician)).toHaveLength(1);
   });
 });
 

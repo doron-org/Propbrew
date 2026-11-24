@@ -62,8 +62,8 @@ const delegates = declarations.filter(({ fn }) => !asyncFunction(fn));
 
 describe('durable authenticated read entrypoints', () => {
   it('covers every authenticated page, including portal/admin and dynamic detail routes', () => {
-    expect(authenticated).toHaveLength(125);
-    expect(authenticated.filter(({ file }) => file.startsWith(GROUPS[0]))).toHaveLength(101);
+    expect(authenticated).toHaveLength(127);
+    expect(authenticated.filter(({ file }) => file.startsWith(GROUPS[0]))).toHaveLength(103);
     expect(authenticated.filter(({ file }) => file.startsWith(GROUPS[1]))).toHaveLength(16);
     expect(authenticated.filter(({ file }) => file.startsWith(GROUPS[2]))).toHaveLength(8);
     expect(authenticated.map(({ file }) => file)).toContain('src/app/(ops)/(estate)/estate/work-orders/[ref]/page.tsx');

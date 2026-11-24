@@ -93,11 +93,8 @@ export function ProfileMenu({ name, roleSummary, tenantLabel, workspace, company
                   <optgroup label="Company-wide">
                     {accountPersonas.map((persona) => <option key={persona.id} value={persona.id}>{persona.label}</option>)}
                   </optgroup>
-                  <optgroup label="Estate user types">
-                    {workspacePersonas('estate').map((persona) => <option key={persona.id} value={persona.id}>{persona.label}</option>)}
-                  </optgroup>
-                  <optgroup label="Facility user types">
-                    {workspacePersonas('facility').map((persona) => <option key={persona.id} value={persona.id}>{persona.label}</option>)}
+                  <optgroup label="Property Management user types">
+                    {[...workspacePersonas('estate'), ...workspacePersonas('facility')].map((persona) => <option key={persona.id} value={persona.id}>{persona.label}</option>)}
                   </optgroup>
                   <optgroup label="Shortlet user types">
                     {workspacePersonas('shortlet').map((persona) => <option key={persona.id} value={persona.id}>{persona.label}</option>)}

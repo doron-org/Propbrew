@@ -1,6 +1,7 @@
 /**
- * The four operator portals share an identity and tenant, never a navigation
- * tree. Selecting a workspace is an information-architecture choice, not a
+ * The operator portals share an identity and tenant. Estate and Facility have
+ * one public property-management entry while retaining their separate module
+ * grants and routes. Selecting a workspace is an information-architecture choice, not a
  * permission grant: every page, query and mutation still checks its capability.
  */
 import { can, type Actor, type Capability } from '@/lib/authz';
@@ -73,6 +74,31 @@ export const WORKSPACES: readonly Workspace[] = [
   },
 ];
 
+/** One public entry, backed by whichever of the two existing grants is present. */
+export const PROPERTY_MANAGEMENT_HOME = '/property-management';
+export const PROPERTY_MANAGEMENT_CARD: Workspace = {
+  id: 'estate',
+  name: 'Property Management',
+  home: PROPERTY_MANAGEMENT_HOME,
+  icon: 'building',
+  accent: '#4242EE',
+  description: 'Run residents, buildings, maintenance and property performance together.',
+  audience: 'Property, estate and facility teams',
+  highlights: [
+    'Open each authorised property or facility site from one portfolio.',
+    'Coordinate residents, service requests, assets and planned maintenance.',
+    'Track collections and community activity where your role permits.',
+    'Use permission-aware AI insights across your assigned work.',
+  ],
+  features: ['Properties', 'Operations', 'Intelligence'],
+};
+export function propertyManagementWorkspace(actor: Actor): Workspace | undefined {
+  const estate = canEnterWorkspace(actor, 'estate');
+  const facility = canEnterWorkspace(actor, 'facility');
+  if (!estate && !facility) return undefined;
+  return { ...PROPERTY_MANAGEMENT_CARD, id: estate ? 'estate' : 'facility' };
+}
+
 const ENTRY_POLICY: Record<WorkspaceId, { roles: readonly Role[]; capabilities: readonly Capability[] }> = {
   estate: {
     roles: ['executive', 'estate_manager', 'facility_manager', 'security'],
@@ -107,7 +133,10 @@ export function canEnterWorkspace(actor: Actor, id: unknown): boolean {
 }
 
 export function availableWorkspaces(actor: Actor): Workspace[] {
-  return WORKSPACES.filter((workspace) => canEnterWorkspace(actor, workspace.id));
+  return [
+    propertyManagementWorkspace(actor),
+    ...WORKSPACES.filter((workspace) => (workspace.id === 'shortlet' || workspace.id === 'construction') && canEnterWorkspace(actor, workspace.id)),
+  ].filter((workspace): workspace is Workspace => Boolean(workspace));
 }
 
 const ESTATE_SEGMENTS = new Set([

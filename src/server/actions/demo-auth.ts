@@ -51,7 +51,7 @@ export async function resetDemoSandbox(_state: DemoState, form: FormData): Promi
     await resetDemoSandboxFor(identity);
   } catch { return { error: 'Your sandbox could not be reset. Please refresh and try again.' }; }
   revalidatePath('/', 'layout');
-  return { message: 'Your sandbox has been reset to fresh sample data across all four modules.' };
+  return { message: 'Your sandbox has been reset to fresh sample data across all three workspaces.' };
 }
 
 export async function switchDemoPersona(id: string): Promise<void> {

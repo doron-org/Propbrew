@@ -58,7 +58,7 @@ describe('company account and access presentation', () => {
     expect(html).toContain('type="password"'); expect(html).toContain('Show password');
     expect(html).not.toContain('name="tenantId"'); expect(html).not.toContain('name="roles"');
     expect(html).not.toContain('type="checkbox"'); expect(html).not.toContain('Google'); expect(html).not.toContain('Clerk');
-    for (const label of ['Estate', 'Facility', 'Shortlet', 'Construction']) expect(html).toContain(label);
+    for (const label of ['Property Management', 'Estate', 'Facility', 'Shortlet', 'Construction']) expect(html).toContain(label);
     expect(action).not.toHaveBeenCalled();
   });
 
@@ -69,19 +69,19 @@ describe('company account and access presentation', () => {
     expect(html).toContain('href="/sign-up"'); expect(html).not.toContain('Forgot password');
   });
 
-  it('offers four clearly labelled demo workspaces without exposing or prefilling credentials', () => {
+  it('offers three clearly labelled demo workspaces without exposing or prefilling credentials', () => {
     for (const mode of ['signup', 'login'] as const) {
       const html = renderToStaticMarkup(createElement(AccountForm, { mode, action, demoEnabled: true }));
       expect(html).toContain('Explore a demo'); expect(html).toContain('Private sandbox');
       expect(html).toContain('sample data'); expect(html).toContain('No sign-up required');
       expect(html).toContain('Add, edit and try workflows'); expect(html).toContain('Your changes stay in your own sandbox');
-      for (const [workspace, detail] of [['Estate', 'People & properties'], ['Facility', 'Assets & maintenance'], ['Shortlet', 'Guests & stays'], ['Construction', 'Projects & delivery']]) {
+      for (const [workspace, detail] of [['Property Management', 'Estate & facility operations'], ['Shortlet', 'Guests & stays'], ['Construction', 'Projects & delivery']]) {
         expect(html).toContain(`<strong>${workspace}</strong><span>${detail.replace('&', '&amp;')}</span>`);
       }
       const demoButtons = [...html.matchAll(/<button[^>]+>/g)].map(([tag]) => tag).filter((tag) => tag.includes('name="module"'));
       expect(demoButtons.every((tag) => !tag.includes('aria-label'))).toBe(true);
-      expect(html.match(/>Explore demo: </g)).toHaveLength(4);
-      expect(demoButtons.map((tag) => /value="([^"]+)"/.exec(tag)?.[1])).toEqual(['estate', 'facility', 'shortlet', 'construction']);
+      expect(html.match(/>Explore demo: </g)).toHaveLength(3);
+      expect(demoButtons.map((tag) => /value="([^"]+)"/.exec(tag)?.[1])).toEqual(['estate', 'shortlet', 'construction']);
       expect(html).not.toContain('@example.invalid'); expect(html).not.toContain('value="demo');
     }
     expect(renderToStaticMarkup(createElement(AccountForm, { mode: 'login', action }))).not.toContain('Explore a demo');

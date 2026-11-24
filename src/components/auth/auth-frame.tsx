@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { ArrowUpRight, Building2, Construction, House, ShieldCheck, Wrench } from 'lucide-react';
+import { ArrowUpRight, Building2, Construction, House, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { PropbrewMark } from '@/components/brand/propbrew-logo';
 import styles from './auth.module.css';
 
-const MODULES = [{ icon: Building2, name: 'Estate', detail: 'People & properties' }, { icon: Wrench, name: 'Facility', detail: 'Assets & maintenance' }, { icon: House, name: 'Shortlet', detail: 'Guests & stays' }, { icon: Construction, name: 'Construction', detail: 'Projects & delivery' }];
+const MODULES = [{ icon: Building2, name: 'Property Management', detail: 'Estate, Facility & maintenance' }, { icon: House, name: 'Shortlet', detail: 'Guests & stays' }, { icon: Construction, name: 'Construction', detail: 'Projects & delivery' }];
 
 export function AuthFrame({ title, description, children, footer }: { title: string; description: string; children: ReactNode; footer?: ReactNode }) {
   return <main className={`pb-app ${styles.authPage}`}><div className={styles.authLayout}>
