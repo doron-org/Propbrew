@@ -5,6 +5,7 @@ import { ArrowRight, Check, LayoutGrid, LockKeyhole, ShieldCheck, Sparkles } fro
 import { PropbrewMark } from '@/components/brand/propbrew-logo';
 import { Icon } from '@/components/icon';
 import { WORKSPACES, PROPERTY_MANAGEMENT_CARD, availableWorkspaces, canEnterWorkspace, propertyManagementWorkspace, workspaceById } from '@/config/workspaces';
+import { constructionArchived } from '@/config/module-archive';
 import { requireOperatorSession } from '@/server/workspaces';
 import { devIdentityEnabled } from '@/server/session';
 import styles from '@/components/workspaces/workspace-chooser.module.css';
@@ -18,14 +19,15 @@ import { db } from '@/server/data/store';
 export const metadata: Metadata = { title: 'Choose your workspace · Propbrew', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
-export default async function WorkspacesPage({ searchParams }: { searchParams: Promise<{ from?: string | string[] }> }) {
+export default async function WorkspacesPage({ searchParams }: { searchParams: Promise<{ from?: string | string[]; archived?: string | string[] }> }) {
   return withDurableRead(async () => {
   const session = await requireOperatorSession();
   const { actor } = session;
-  const from = (await searchParams).from;
+  const params = await searchParams;
+  const from = params.from;
   const current = workspaceById(typeof from === 'string' ? from : undefined);
   const available = availableWorkspaces(actor);
-  const choices = [propertyManagementWorkspace(actor) ?? PROPERTY_MANAGEMENT_CARD, ...WORKSPACES.filter((workspace) => workspace.id === 'shortlet' || workspace.id === 'construction')];
+  const choices = [propertyManagementWorkspace(actor) ?? PROPERTY_MANAGEMENT_CARD, ...WORKSPACES.filter((workspace) => workspace.id === 'shortlet' || (workspace.id === 'construction' && !constructionArchived()))];
   const name = session.key === 'clerk' ? session.label : session.label.split(' — ')[0];
   const demo = session.key !== 'clerk' && devIdentityEnabled();
   const principal = currentRecordContext()?.companyPrincipal;
@@ -46,8 +48,9 @@ export default async function WorkspacesPage({ searchParams }: { searchParams: P
         <section className={styles.intro} aria-labelledby="workspace-title">
           <p className={styles.eyebrow}><LayoutGrid size={13} aria-hidden="true" />One account. Focused workspaces.</p>
           <h1 id="workspace-title">Choose your workspace</h1>
-          <p>Run Estate and Facility together in Property Management. Shortlet and Construction have their own focused workspaces.</p>
+          <p>Run Estate and Facility together in Property Management. Shortlet has its own focused workspace.</p>
         </section>
+        {params.archived === 'construction' && constructionArchived() && <p className={styles.accessNote} role="status"><ShieldCheck size={14} aria-hidden="true" /><span>Construction is archived for now. Its project records and access assignments are preserved.</span></p>}
         {showSetup && <section className={styles.setupPrompt} aria-label="Portfolio setup">
           <div><strong>{ownerSetup.version > 0 ? 'Your portfolio setup is saved' : 'Make this company your own'}</strong>
             <p>{ownerSetup.version > 0 ? 'Continue from your last saved step and create your first property and units.' : 'Set up your portfolio and create your first property and units when you are ready.'}</p></div>

@@ -7,11 +7,12 @@ import { ProductTour } from '@/components/marketing/product-tour';
 import { PropbrewMark } from '@/components/brand/propbrew-logo';
 import { SITE_URL } from '@/config/site';
 import { websiteOnlyEnabled } from '@/lib/website-release';
+import { constructionArchived } from '@/config/module-archive';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: 'Propbrew | Great places. Better run.',
-  description: 'Connect estate management, facility operations, construction and your community in one intelligent property workspace. Built for Nigeria and a brighter property future.',
+  description: 'Connect estate management, facility operations and your community in one intelligent property workspace. Built for Nigeria and a brighter property future.',
   openGraph: {
     type: 'website',
     siteName: 'Propbrew',
@@ -29,11 +30,11 @@ export const metadata: Metadata = {
 };
 
 const FAQ = [
-  { question: 'What is Propbrew?', answer: 'Propbrew connects the property lifecycle in one workspace: construction, facilities, estate management, resident services, short-let and portfolio reporting. Teams can follow the work, the people and the money without piecing together separate tools.' },
-  { question: 'Can I explore it before committing?', answer: 'Yes. Explore the demo to see the product using a sample portfolio. Figures and properties in the tour are illustrative. Production onboarding includes infrastructure setup, provider configuration and user acceptance testing.', previewAnswer: 'Yes. Explore the interactive sample preview on this page and switch between Operate, Build and Serve. Its properties, figures and AI examples are illustrative. The operational platform is activated separately after infrastructure setup, provider configuration and user acceptance testing.' },
+  { question: 'What is Propbrew?', answer: 'Propbrew connects facility and estate management, resident services, short-let and portfolio reporting. Teams can follow the work, the people and the money without piecing together separate tools.' },
+  { question: 'Can I explore it before committing?', answer: 'Yes. Explore the demo to see the product using a sample portfolio. Figures and properties in the tour are illustrative. Production onboarding includes infrastructure setup, provider configuration and user acceptance testing.', previewAnswer: 'Yes. Explore the interactive sample preview on this page and switch between Operate and Serve. Its properties, figures and AI examples are illustrative. The operational platform is activated separately after infrastructure setup, provider configuration and user acceptance testing.' },
   { question: 'Is it built for Nigerian property teams?', answer: 'Yes. Propbrew includes naira-based records, generator and water asset workflows, field capture for intermittent connectivity, and communication workflows suited to estate teams. Payments and messaging providers are configured during deployment.' },
-  { question: 'What can the AI help with?', answer: 'The copilot helps teams understand their records, review operational risks and prepare the next action. Document and construction assistance use the shared AI gateway. Sensitive actions and outbound AI-generated communications require human approval.' },
-  { question: 'Does every team need every module?', answer: 'No. Start with the operations you need, then add construction, short-let or portfolio views as your business grows. Role and estate scopes determine what each person can see and do.' },
+  { question: 'What can the AI help with?', answer: 'The copilot helps teams understand their records, review operational risks and prepare the next action. Sensitive actions and outbound AI-generated communications require human approval.' },
+  { question: 'Does every team need every module?', answer: 'No. Start with the operations you need, then add short-let or portfolio views as your business grows. Role and estate scopes determine what each person can see and do.' },
   { question: 'What happens when the connection drops?', answer: 'Supported field-capture workflows save updates on the device and queue them for syncing when connectivity returns. Media and conflicts have their own sync states so teams can see what still needs attention.' },
 ];
 
@@ -68,7 +69,7 @@ export default function LandingPage() {
               <Link className="pb-card-link" href={productHref('/collections')}>Explore collections<ArrowUpRight size={17} aria-hidden="true" /></Link>
             </article>
             <article className="pb-outcome pb-outcome-community"><div className="pb-outcome-icon"><Users size={21} aria-hidden="true" /></div><h3>A place to live.<br />A community to belong to.</h3><p>Requests, announcements, bookings and visitor passes. Residents can see progress. Managers can keep the conversation moving.</p><div className="pb-community-demo"><span className="pb-community-avatar">T</span><div><strong>Your maintenance request</strong><p>Your technician has been assigned.<br />You can follow the progress in your portal.</p><span><CheckCheck size={14} aria-hidden="true" />A clearer update. A better day.</span></div></div><Link className="pb-card-link" href={productHref('/portal')}>Explore the resident portal<ArrowUpRight size={17} aria-hidden="true" /></Link></article>
-            <article className="pb-outcome pb-outcome-build"><div className="pb-outcome-icon"><HardHat size={21} aria-hidden="true" /></div><h3>Build with<br />the bigger picture.</h3><p>Bring schedules, procurement, site evidence and cost exposure together. Keep every milestone connected to the decisions behind it.</p><div className="pb-build-demo"><span>From programme to handover</span><div><i /><i /><i /><i /></div><p><span>Plan</span><span>Procure</span><span>Build</span><span>Deliver</span></p></div><Link className="pb-card-link" href={productHref('/construction')}>Explore construction<ArrowUpRight size={17} aria-hidden="true" /></Link></article>
+            {!constructionArchived() && <article className="pb-outcome pb-outcome-build"><div className="pb-outcome-icon"><HardHat size={21} aria-hidden="true" /></div><h3>Build with<br />the bigger picture.</h3><p>Bring schedules, procurement, site evidence and cost exposure together. Keep every milestone connected to the decisions behind it.</p><div className="pb-build-demo"><span>From programme to handover</span><div><i /><i /><i /><i /></div><p><span>Plan</span><span>Procure</span><span>Build</span><span>Deliver</span></p></div><Link className="pb-card-link" href={productHref('/construction')}>Explore construction<ArrowUpRight size={17} aria-hidden="true" /></Link></article>}
           </div>
           <div className="pb-expansion"><span>And room for what comes next.</span><Link href={productHref('/shortlet')}>Short-let operations<ArrowUpRight size={14} aria-hidden="true" /></Link><Link href={productHref('/portfolio')}>Portfolio intelligence<ArrowUpRight size={14} aria-hidden="true" /></Link><Link href={productHref('/investors')}>Investor reporting<ArrowUpRight size={14} aria-hidden="true" /></Link></div>
         </div>

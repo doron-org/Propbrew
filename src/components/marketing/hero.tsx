@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowDown, ArrowUpRight, Building2, HardHat, Users, Wrench } from 'lucide-react';
+import { constructionArchived } from '@/config/module-archive';
 
 export function Hero({ websiteOnly = false }: { websiteOnly?: boolean }) {
   return (
@@ -25,7 +26,7 @@ export function Hero({ websiteOnly = false }: { websiteOnly?: boolean }) {
         <p>One platform.<br /><strong>A whole world of property.</strong></p>
         <div><Wrench size={18} aria-hidden="true" /><span>Facilities</span></div>
         <div><Users size={18} aria-hidden="true" /><span>Estates & communities</span></div>
-        <div><HardHat size={18} aria-hidden="true" /><span>Construction</span></div>
+        {!constructionArchived() && <div><HardHat size={18} aria-hidden="true" /><span>Construction</span></div>}
         <div><Building2 size={18} aria-hidden="true" /><span>Portfolios</span></div>
       </div>
     </section>

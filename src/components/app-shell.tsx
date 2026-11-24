@@ -113,7 +113,12 @@ export function AppShell({
   const goTo = (href: string) => { setQuery(''); setSearchOpen(false); router.push(href); };
   const [signingOut, startSignOut] = useTransition();
 
-  const activeHref = activeNavHref(groups, pathname, currentQuery);
+  // Legacy Estate and Facility overview URLs remain available, but both now
+  // live under the single Property Management entry in the rail.
+  const activeHref = activeNavHref(groups, pathname, currentQuery)
+    ?? ((pathname === '/estate' || pathname === '/facility') && workspace?.home === '/property-management'
+      ? '/property-management'
+      : null);
   const activeGroupLabel = groups.find((group) => group.items.some((item) => item.href === activeHref || item.children?.some((child) => child.href === activeHref)))?.label;
   const effectiveOpenNavGroups = activeGroupLabel && !openNavGroups.has(activeGroupLabel)
     ? new Set([...openNavGroups, activeGroupLabel])

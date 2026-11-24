@@ -10,6 +10,7 @@ import { consumeAuthAttempt } from '@/server/auth/rate-limit';
 import { DEMO_ACCOUNTS, demoAccountsEnabled, isDemoAccount } from '@/server/auth/demo-config';
 import { ensureDemoSandbox, resetDemoSandboxFor } from '@/server/auth/demo-sandbox';
 import { DEMO_PERSONAS, DEMO_PERSONA_COOKIE } from '@/config/demo-personas';
+import { constructionArchived } from '@/config/module-archive';
 
 type DemoState = { error?: string; message?: string };
 
@@ -17,6 +18,7 @@ export async function enterDemoAccount(_state: DemoState, form: FormData): Promi
   if (!demoAccountsEnabled()) return { error: 'Demo access is not available right now. You can still create your own company account.' };
   const account = DEMO_ACCOUNTS.find((entry) => entry.module === form.get('module'));
   if (!account) return { error: 'Choose an available demo workspace.' };
+  if (account.module === 'construction' && constructionArchived()) return { error: 'Construction is archived for now.' };
   try {
     const existing = await getNativeIdentity();
     if (existing && !isDemoAccount(existing.user.id)) return { error: 'Sign out of your company account before exploring a demo.' };
@@ -39,7 +41,7 @@ export async function enterDemoAccount(_state: DemoState, form: FormData): Promi
   } catch {
     return { error: 'The demo is busy or temporarily unavailable. Please try again later, or create your own company account.' };
   }
-  redirect(`/${account.module}`);
+  redirect(account.module === 'estate' || account.module === 'facility' ? '/property-management' : `/${account.module}`);
 }
 
 export async function resetDemoSandbox(_state: DemoState, form: FormData): Promise<DemoState> {
@@ -51,7 +53,7 @@ export async function resetDemoSandbox(_state: DemoState, form: FormData): Promi
     await resetDemoSandboxFor(identity);
   } catch { return { error: 'Your sandbox could not be reset. Please refresh and try again.' }; }
   revalidatePath('/', 'layout');
-  return { message: 'Your sandbox has been reset to fresh sample data across all three workspaces.' };
+  return { message: 'Your sandbox has been reset to fresh sample data across the available workspaces.' };
 }
 
 export async function switchDemoPersona(id: string): Promise<void> {
@@ -60,6 +62,7 @@ export async function switchDemoPersona(id: string): Promise<void> {
   if (!identity || !isDemoAccount(identity.user.id)) throw new Error('A signed-in demo account is required.');
   const persona = DEMO_PERSONAS.find((entry) => entry.id === id);
   if (!persona) throw new Error('Choose an available demo user type.');
+  if (constructionArchived() && persona.modules.construction && Object.keys(persona.modules).length === 1) throw new Error('Construction is archived for now.');
   await consumeAuthAttempt('demo-persona-switch', identity.session.id, 120, 3600);
   const store = await cookies();
   store.set(DEMO_PERSONA_COOKIE, persona.id, {

@@ -8,6 +8,7 @@ import { can, type Actor, type Capability } from '@/lib/authz';
 import { canUseCompanyModule } from '@/lib/auth/company-policy';
 import type { Role } from '@/domain/enums';
 import type { IconName } from '@/components/icon';
+import { constructionArchived } from './module-archive';
 
 export type WorkspaceId = 'estate' | 'facility' | 'shortlet' | 'construction';
 
@@ -126,6 +127,7 @@ export function workspaceById(id: unknown): Workspace | undefined {
 export function canEnterWorkspace(actor: Actor, id: unknown): boolean {
   const workspace = workspaceById(id);
   if (!workspace || !actor.tenantId?.trim() || actor.roles.includes('platform_admin')) return false;
+  if (workspace.id === 'construction' && constructionArchived()) return false;
   if (!canUseCompanyModule(actor, workspace.id, 'read')) return false;
   const policy = ENTRY_POLICY[workspace.id];
   return policy.roles.some((role) => actor.roles.includes(role))

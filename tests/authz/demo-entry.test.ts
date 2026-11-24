@@ -91,13 +91,21 @@ describe('demo entry server action', () => {
     form.set('email', 'attacker@example.invalid'); form.set('password', 'attacker-supplied-credential');
     form.set('userId', 'caller-controlled-user'); form.set('tenantId', 'caller-controlled-company');
     form.set('redirect', 'https://attacker.example.invalid'); form.set('role', 'owner');
-    await expect(enterDemoAccount({}, form)).rejects.toThrow(`REDIRECT:/${account.module}`);
+    const destination = account.module === 'estate' || account.module === 'facility' ? '/property-management' : `/${account.module}`;
+    await expect(enterDemoAccount({}, form)).rejects.toThrow(`REDIRECT:${destination}`);
     expect(boundary.consume).toHaveBeenCalledExactlyOnceWith('demo-entry-global', 'public-demo', 60, 3600);
     expect(boundary.signIn).toHaveBeenCalledExactlyOnceWith({ headers, body: { email: account.email, password: PASSWORD, rememberMe: true } });
     expect(boundary.query).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('auth_sessions'), [TOKEN, account.userId]);
     expect(boundary.ensureSandbox).toHaveBeenCalledExactlyOnceWith({ user, session: { id: SESSION_ID } });
     expect(boundary.activateCompany).toHaveBeenCalledExactlyOnceWith({ user, session: { id: SESSION_ID } }, SANDBOX_ID);
-    expect(boundary.redirect).toHaveBeenCalledExactlyOnceWith(`/${account.module}`);
+    expect(boundary.redirect).toHaveBeenCalledExactlyOnceWith(destination);
+  });
+
+  it('does not open the archived Construction demo', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ENABLE_CONSTRUCTION', 'false');
+    await expect(enterDemoAccount({}, formFor('construction'))).resolves.toEqual({ error: 'Construction is archived for now.' });
+    expect(boundary.getIdentity).not.toHaveBeenCalled();
+    expect(boundary.signIn).not.toHaveBeenCalled();
   });
 
   it('allows an already signed-in demo visitor to choose another demo workspace', async () => {

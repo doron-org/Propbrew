@@ -19,7 +19,7 @@ test('legacy dashboard opens the workspace chooser', async ({ page }) => {
   await expect(page).toHaveURL(/\/workspaces$/, { timeout: 30_000 });
   await expect(page.getByRole('heading', { name: 'Choose your workspace', exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('main')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Enter Estate workspace', exact: true })).toHaveAttribute('href', '/estate');
+  await expect(page.getByRole('link', { name: 'Enter Property Management workspace', exact: true })).toHaveAttribute('href', '/property-management');
 });
 
 test('Estate overview includes portfolio operations and currency-specific empty states', async ({ page }) => {
@@ -60,9 +60,9 @@ test('Estate creation actions open accessible dialogs and can be cancelled', asy
 
 test('Estate Properties supports list/grid views, unit details and navigation order', async ({ page }) => {
   await page.goto('/properties');
-  const nav = page.getByRole('navigation', { name: 'Estate navigation', exact: true });
+  const nav = page.getByRole('navigation', { name: 'Property Management navigation', exact: true });
   const firstLinks = await nav.getByRole('link').evaluateAll((links) => links.slice(0, 3).map((link) => link.getAttribute('href')));
-  expect(firstLinks).toEqual(['/estate', '/properties']);
+  expect(firstLinks).toEqual(['/property-management', '/properties']);
   await expect(page.getByRole('table', { name: 'Property list', exact: true })).toBeVisible();
   await selectPropertyView(page.getByRole('button', { name: 'Grid view', exact: true }));
   await expect(page.getByRole('button', { name: 'Grid view', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -86,14 +86,17 @@ test('Estate Properties supports list/grid views, unit details and navigation or
   await expect(page.getByRole('dialog', { name: 'Add property', exact: true })).toBeVisible();
 });
 
-for (const workspace of ['Estate', 'Facility', 'Shortlet', 'Construction']) {
+for (const [workspace, id, home] of [
+  ['Property Management', 'estate', '/property-management'],
+  ['Shortlet', 'shortlet', '/shortlet'],
+  ['Construction', 'construction', '/construction'],
+] as const) {
   test(`${workspace} opens a dedicated portal and returns to the chooser`, async ({ page }) => {
-    const id = workspace.toLowerCase();
     await page.goto('/workspaces');
     await page.getByRole('link', { name: `Enter ${workspace} workspace`, exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/${id}$`));
+    await expect(page).toHaveURL(new RegExp(`${home}$`));
     await expect(page.getByRole('navigation', { name: `${workspace} navigation`, exact: true })).toBeVisible();
-    for (const other of ['Estate', 'Facility', 'Shortlet', 'Construction'].filter((name) => name !== workspace)) {
+    for (const other of ['Property Management', 'Shortlet', 'Construction'].filter((name) => name !== workspace)) {
       await expect(page.getByRole('navigation', { name: `${other} navigation`, exact: true })).toHaveCount(0);
     }
     await page.getByRole('button', { name: /^Account menu — / }).click();

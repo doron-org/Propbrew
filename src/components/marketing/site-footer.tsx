@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { PropbrewLogo } from '@/components/brand/propbrew-logo';
 import { brand } from '@/config/brand';
+import { constructionArchived } from '@/config/module-archive';
 
 const COLUMNS = [
   {
@@ -46,7 +47,7 @@ export function SiteFooter({ websiteOnly = false }: { websiteOnly?: boolean }) {
   const columns = COLUMNS.map((column) => ({
     ...column,
     links: column.links
-      .filter((link) => !websiteOnly || (link.href !== '/login' && !link.href.startsWith('/admin')))
+      .filter((link) => (!constructionArchived() || link.href !== '/construction') && (!websiteOnly || (link.href !== '/login' && !link.href.startsWith('/admin'))))
       .map((link) => ({
         ...link,
         href: websiteOnly && link.href.startsWith('/') ? '/#platform' : link.href,

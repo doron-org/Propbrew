@@ -86,7 +86,7 @@ try {
     DATA_SOURCE: 'postgres', PROPBREW_AUTH_MODE: 'company', PROPBREW_REVIEW_MODE: '0', PROPBREW_WEBSITE_ONLY: '0',
     PROPBREW_DEMO_ACCOUNTS: '1', PROPBREW_DEMO_PASSWORD: demoPassword,
     BETTER_AUTH_URL: origin, NEXT_PUBLIC_SITE_URL: origin, BETTER_AUTH_SECRET: 'disposable-browser-company-account-secret-never-production',
-    REEVE_ALLOW_DEMO_IDENTITIES: '0', REEVE_ALLOW_IN_MEMORY_DATA: '0', NEXT_PUBLIC_DEV_IDENTITY: '0',
+    REEVE_ALLOW_DEMO_IDENTITIES: '0', REEVE_ALLOW_IN_MEMORY_DATA: '0', NEXT_PUBLIC_DEV_IDENTITY: '0', NEXT_PUBLIC_ENABLE_CONSTRUCTION: 'true',
     CLERK_SECRET_KEY: '', NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
     OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', BLOB_READ_WRITE_TOKEN: '',
   };
@@ -98,7 +98,7 @@ try {
     // server settings are still read per request at start time.
     const buildEnv = {
       ...safeEnv, NEXT_TELEMETRY_DISABLED: '1',
-      NEXT_PUBLIC_SITE_URL: origin, NEXT_PUBLIC_DEV_IDENTITY: '0', NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
+      NEXT_PUBLIC_SITE_URL: origin, NEXT_PUBLIC_DEV_IDENTITY: '0', NEXT_PUBLIC_ENABLE_CONSTRUCTION: 'true', NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
     };
     await run(process.execPath, [join(root, 'node_modules/next/dist/bin/next'), 'build', '--webpack'], { cwd: app, env: buildEnv, visible: true });
   }

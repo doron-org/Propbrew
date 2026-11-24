@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MATRIX, ROLES, can, type Actor, type Role } from '@/lib/authz';
 import { PAGE_META, visibleNav } from '@/config/nav';
 import {
@@ -10,6 +10,7 @@ import {
   workspaceForPath,
   type WorkspaceId,
 } from '@/config/workspaces';
+import { archivedConstructionPath, constructionArchived } from '@/config/module-archive';
 
 function actor(roles: readonly Role[], overrides: Partial<Actor> = {}): Actor {
   return {
@@ -36,6 +37,22 @@ const PUBLIC_EXPECTED: Record<Role, WorkspaceId[]> = Object.fromEntries(
 ) as Record<Role, WorkspaceId[]>;
 
 describe('operator workspace registry', () => {
+  it('archives Construction without deleting its registry or grants', () => {
+    vi.stubEnv('NEXT_PUBLIC_ENABLE_CONSTRUCTION', 'false');
+    try {
+      expect(constructionArchived()).toBe(true);
+      expect(workspaceById('construction')?.home).toBe('/construction');
+      expect(canEnterWorkspace(actor(['executive']), 'construction')).toBe(false);
+      expect(availableWorkspaces(actor(['executive'])).map((workspace) => workspace.name))
+        .toEqual(['Property Management', 'Shortlet']);
+      for (const path of ['/construction', '/construction/projects/cp-cedar', '/api/construction/drawings', '/api/mobile/v1/construction/sync']) {
+        expect(archivedConstructionPath(path)).toBe(true);
+      }
+      expect(archivedConstructionPath('/api/constructional')).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it('keeps white workspace button labels at accessible contrast', () => {
     for (const { accent } of WORKSPACES) {
       const channels = [1, 3, 5].map((start) => {

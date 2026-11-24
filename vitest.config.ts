@@ -9,6 +9,7 @@ export default defineConfig({
     },
   },
   test: {
+    env: { NEXT_PUBLIC_ENABLE_CONSTRUCTION: 'true' },
     include: ['tests/**/*.{test,spec}.ts', 'src/**/*.{test,spec}.ts'],
     exclude: ['tests/e2e/**', 'tests/e2e-company-auth/**'],
     environment: 'node',

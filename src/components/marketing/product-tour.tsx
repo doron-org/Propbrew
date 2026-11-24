@@ -4,8 +4,9 @@ import { useRef, useState, type KeyboardEvent } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, Bell, Building2, Check, ChevronDown, CircleHelp, ClipboardList, HardHat, LayoutDashboard, Search, Sparkles, Users, Wallet, Wrench } from 'lucide-react';
 import { PropbrewMark } from '@/components/brand/propbrew-logo';
+import { constructionArchived } from '@/config/module-archive';
 
-const WORKSPACES = [
+const ALL_WORKSPACES = [
   {
     name: 'Operate', icon: Wrench, title: 'A good day starts with a clear picture.', subtitle: 'Facility control center', href: '/control-center',
     metrics: [{ label: 'Assets tracked', value: '240', detail: 'Across the portfolio' }, { label: 'Open work orders', value: '18', detail: 'Every job has an owner' }, { label: 'PPM compliance', value: '78%', detail: 'Planned maintenance' }],
@@ -34,6 +35,7 @@ const WORKSPACES = [
     ], insight: 'Nine units need a collections follow-up. Review balances before preparing a reminder.', insightHref: '/collections', insightLabel: 'Review collections',
   },
 ] as const;
+const WORKSPACES = ALL_WORKSPACES.filter((workspace) => !constructionArchived() || workspace.name !== 'Build');
 
 export function ProductTour({ websiteOnly = false }: { websiteOnly?: boolean }) {
   const [active, setActive] = useState(0);

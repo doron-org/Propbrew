@@ -17,6 +17,7 @@ export default defineConfig({
     env: {
       NODE_ENV: 'development',
       NEXT_PUBLIC_DEV_IDENTITY: '1',
+      NEXT_PUBLIC_ENABLE_CONSTRUCTION: 'true',
       PROPBREW_REVIEW_MODE: '0',
       PROPBREW_WEBSITE_ONLY: '0',
       DATA_SOURCE: 'memory',

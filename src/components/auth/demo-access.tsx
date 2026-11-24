@@ -3,12 +3,13 @@
 import { useActionState, useEffect, useId, useRef, useState } from 'react';
 import { ArrowUpRight, Building2, Construction, House, LoaderCircle } from 'lucide-react';
 import { enterDemoAccount } from '@/server/actions/demo-auth';
+import { constructionArchived } from '@/config/module-archive';
 import styles from './demo-access.module.css';
 
 const WORKSPACES = [
   { id: 'estate', name: 'Property Management', detail: 'Estate & facility operations', icon: Building2 },
   { id: 'shortlet', name: 'Shortlet', detail: 'Guests & stays', icon: House },
-  { id: 'construction', name: 'Construction', detail: 'Projects & delivery', icon: Construction },
+  ...(!constructionArchived() ? [{ id: 'construction', name: 'Construction', detail: 'Projects & delivery', icon: Construction }] : []),
 ] as const;
 
 export function DemoAccess({ disabled = false }: { disabled?: boolean }) {

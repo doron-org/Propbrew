@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { PortalDialog } from '@/components/portal/portal-dialog';
 import type { WorkspaceId } from '@/config/workspaces';
 import { operationalProfileById, PROFILES_BY_WORKSPACE } from '@/config/operational-profiles';
+import { constructionArchived } from '@/config/module-archive';
 import type { CompanyActionState, CompanyFormAction } from './company-chooser';
 import shared from '@/components/ui/workspace-layout.module.css';
 import styles from './auth.module.css';
@@ -33,7 +34,7 @@ const MODULES: { id: WorkspaceId; label: string; detail: string }[] = [
   { id: 'estate', label: 'Estate permissions', detail: 'Properties, residents, community and finance' },
   { id: 'facility', label: 'Facility permissions', detail: 'Assets, maintenance and site operations' },
   { id: 'shortlet', label: 'Shortlet', detail: 'Guests, bookings and stay operations' },
-  { id: 'construction', label: 'Construction', detail: 'Projects, procurement and delivery' },
+  { id: 'construction', label: constructionArchived() ? 'Construction · archived' : 'Construction', detail: constructionArchived() ? 'Existing permissions are retained for a future reopening' : 'Projects, procurement and delivery' },
 ];
 const accessLabel = (access: 'manage' | 'view' | undefined) => access === 'manage' ? 'Manage' : access === 'view' ? 'View' : 'No access';
 

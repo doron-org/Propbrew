@@ -6,6 +6,7 @@ import { useFormStatus } from 'react-dom';
 import { ArrowRight, Building2, Check, Plus, ShieldCheck } from 'lucide-react';
 import { PropbrewMark } from '@/components/brand/propbrew-logo';
 import { signOut } from '@/server/actions/auth';
+import { constructionArchived } from '@/config/module-archive';
 import styles from './auth.module.css';
 
 export type CompanyActionState = { error?: string; fieldErrors?: Record<string, string[] | undefined>; message?: string; inviteUrl?: string };
@@ -13,7 +14,7 @@ export type CompanyFormAction = (data: FormData) => Promise<CompanyActionState |
 export type CompanySummary = { id: string; name: string; role: string; modules: string[] };
 const workspaceLabels = (modules: string[]) => [
   ...(modules.includes('estate') || modules.includes('facility') ? ['Property Management'] : []),
-  ...modules.filter((module) => module !== 'estate' && module !== 'facility').map((module) => module === 'shortlet' ? 'Shortlet' : module === 'construction' ? 'Construction' : module),
+  ...modules.filter((module) => module !== 'estate' && module !== 'facility').map((module) => module === 'shortlet' ? 'Shortlet' : module === 'construction' ? constructionArchived() ? 'Construction · archived' : 'Construction' : module),
 ];
 
 export function CompanyChooser({ companies, currentCompanyId, userName, createCompany, selectCompany, demo = false }: { companies: CompanySummary[]; currentCompanyId?: string | null; userName?: string; createCompany: CompanyFormAction; selectCompany: (companyId: string) => Promise<CompanyActionState | void>; demo?: boolean }) {

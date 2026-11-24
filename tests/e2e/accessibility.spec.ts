@@ -11,7 +11,7 @@ test.describe('WCAG 2.1 A/AA release scans', () => {
     ['estate-shell', '/estate'],
     ['facility-shell', '/facility'],
     ['shortlet-shell', '/shortlet'],
-    ['construction-shell', '/construction'],
+    ...(process.env.NEXT_PUBLIC_ENABLE_CONSTRUCTION === 'true' ? [['construction-shell', '/construction']] as const : []),
   ] as const) {
     test(surface, async ({ page }, testInfo) => {
       await page.goto(route, { waitUntil: 'domcontentloaded' });

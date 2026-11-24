@@ -10,6 +10,7 @@ import { Popover } from './popover';
 import { signOut } from '@/server/actions/auth';
 import { switchDemoPersona } from '@/server/actions/demo-auth';
 import { DEMO_PERSONAS, type DemoPersonaId } from '@/config/demo-personas';
+import { constructionArchived } from '@/config/module-archive';
 
 export function ProfileMenu({ name, roleSummary, tenantLabel, workspace, companyAccount, canManageTeam, demoPersonaId }: {
   name: string;
@@ -99,9 +100,9 @@ export function ProfileMenu({ name, roleSummary, tenantLabel, workspace, company
                   <optgroup label="Shortlet user types">
                     {workspacePersonas('shortlet').map((persona) => <option key={persona.id} value={persona.id}>{persona.label}</option>)}
                   </optgroup>
-                  <optgroup label="Construction user types">
+                  {!constructionArchived() && <optgroup label="Construction user types">
                     {workspacePersonas('construction').map((persona) => <option key={persona.id} value={persona.id}>{persona.label}</option>)}
-                  </optgroup>
+                  </optgroup>}
                 </select>
               </label>
               <p className="mt-2 text-[11.5px] leading-5 text-text-3">{pending ? 'Switching user type…' : activePersona.description}</p>

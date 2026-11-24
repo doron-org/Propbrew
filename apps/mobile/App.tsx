@@ -9,12 +9,14 @@ import type { ConstructionBootstrap } from './src/construction/types';
 type Screen = 'home'|'payments'|'visitors'|'requests'|'community'|'profile';
 type Bootstrap = { profile:{firstName:string;activeUnitId:string};summary:{wallet:{minor:number;currency:string};pending:{minor:number;currency:string}[];openRequests:number};announcements:{id:string;title:string;body?:string}[];invoices:{id:string;ref:string;description:string;status:string;amount:{minor:number;currency:string};paid:{minor:number;currency:string}}[];requests:{id:string;ref:string;title:string;status:string}[] };
 const blue='#315cff', ink='#090a0c', paper='#f3f3f1';
+// The field app remains in source and on-device storage for a future reopening.
+const constructionEnabled = process.env.EXPO_PUBLIC_ENABLE_CONSTRUCTION === 'true';
 const ngn=(n:number)=>new Intl.NumberFormat('en-NG',{style:'currency',currency:'NGN',maximumFractionDigits:0}).format(n/100);
 
 export default function App() {
   const [data, setData] = useState<Bootstrap | null>(null);
   const [construction, setConstruction] = useState<ConstructionBootstrap | null>(null);
-  const [mode, setMode] = useState<'estate' | 'construction'>('construction');
+  const [mode, setMode] = useState<'estate' | 'construction'>('estate');
   const [screen, setScreen] = useState<Screen>('home');
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
@@ -22,14 +24,14 @@ export default function App() {
   const [accessError, setAccessError] = useState('');
 
   const refresh = useCallback(async () => {
-    const [estateResult, constructionResult] = await Promise.allSettled([bootstrap<Bootstrap>(), constructionBootstrap()]);
+    const [estateResult, constructionResult] = await Promise.allSettled([bootstrap<Bootstrap>(), constructionEnabled ? constructionBootstrap() : Promise.resolve(null)]);
     const estateData = estateResult.status === 'fulfilled' ? estateResult.value : null;
     const constructionData = constructionResult.status === 'fulfilled' ? constructionResult.value : null;
     if (constructionData) {
       await saveConstructionCache(constructionData).catch(() => undefined);
       setConstruction(constructionData);
       setOfflineCopy(false);
-    } else if (constructionResult.status === 'rejected' && constructionResult.reason instanceof ApiError && [401, 403].includes(constructionResult.reason.status)) setConstruction(null);
+    } else if (!constructionEnabled || constructionResult.status === 'rejected' && constructionResult.reason instanceof ApiError && [401, 403, 404].includes(constructionResult.reason.status)) setConstruction(null);
     if (estateData) setData(estateData);
     else if (estateResult.status === 'rejected' && estateResult.reason instanceof ApiError && [401, 403].includes(estateResult.reason.status)) setData(null);
     if (estateData || constructionData) {
@@ -37,13 +39,13 @@ export default function App() {
       setMode((current) => current === 'estate' && estateData ? 'estate' : constructionData ? 'construction' : 'estate');
     } else {
       const errors = [estateResult, constructionResult].filter((item): item is PromiseRejectedResult => item.status === 'rejected').map((item) => item.reason);
-      const noConstructionNetwork = constructionResult.status === 'rejected' && !(constructionResult.reason instanceof ApiError);
+      const noConstructionNetwork = constructionEnabled && constructionResult.status === 'rejected' && !(constructionResult.reason instanceof ApiError);
       const cached = noConstructionNetwork && await hasSessionCookie() ? await lastCachedConstruction() : null;
       if (cached) { setConstruction(cached); setOfflineCopy(true); setAuthenticated(true); setMode('construction'); setAccessError(''); }
       else {
         setAuthenticated(false);
         setAccessError(errors.every((error) => error instanceof ApiError && error.status === 403)
-          ? 'This account has no Estate resident or Construction field access. Ask your company administrator to assign a mobile role.' : '');
+          ? constructionEnabled ? 'This account has no Estate resident or Construction field access. Ask your company administrator to assign a mobile role.' : 'This account has no Estate mobile access. Ask your company administrator to assign a resident role.' : '');
       }
     }
     setLoading(false);
@@ -69,11 +71,11 @@ export default function App() {
 
   if (loading) return <SafeAreaView style={s.center}><ActivityIndicator color={blue} /></SafeAreaView>;
   if (!authenticated) return <Login onDone={refresh} error={accessError} />;
-  if (mode === 'construction' && construction) return <ConstructionApp data={construction} cached={offlineCopy} onRefresh={refresh}
+  if (constructionEnabled && mode === 'construction' && construction) return <ConstructionApp data={construction} cached={offlineCopy} onRefresh={refresh}
     onSwitch={data ? () => setMode('estate') : undefined} onSignOut={exit} />;
-  if (!data) return <SafeAreaView style={s.center}><Text>No mobile workspace is assigned to this account.</Text></SafeAreaView>;
+  if (!data) return <SafeAreaView style={s.center}><Text>No mobile workspace is assigned to this account.</Text><Pressable accessibilityRole="button" onPress={exit} style={s.workspaceAction}><Text style={s.workspaceActionText}>Sign out</Text></Pressable></SafeAreaView>;
   return <SafeAreaView style={s.app}><StatusBar barStyle="dark-content" />
-    <View style={s.workspaceBar}><Text style={s.workspaceName}>Estate</Text>{construction ? <Pressable accessibilityRole="button" style={s.workspaceAction} onPress={() => setMode('construction')}><Text style={s.workspaceActionText}>Construction field →</Text></Pressable> : null}<Pressable accessibilityRole="button" accessibilityLabel="Sign out" style={s.workspaceAction} onPress={exit}><Ionicons name="log-out-outline" size={20} color={blue} /></Pressable></View>
+    <View style={s.workspaceBar}><Text style={s.workspaceName}>Estate</Text>{constructionEnabled && construction ? <Pressable accessibilityRole="button" style={s.workspaceAction} onPress={() => setMode('construction')}><Text style={s.workspaceActionText}>Construction field →</Text></Pressable> : null}<Pressable accessibilityRole="button" accessibilityLabel="Sign out" style={s.workspaceAction} onPress={exit}><Ionicons name="log-out-outline" size={20} color={blue} /></Pressable></View>
     <View style={s.body}>{screen === 'home' ? <Home data={data} go={setScreen} /> : screen === 'payments' ? <Payments data={data} back={() => setScreen('home')} refresh={refresh} /> : screen === 'requests' ? <Requests data={data} back={() => setScreen('home')} refresh={refresh} /> : <Simple title={screen.charAt(0).toUpperCase() + screen.slice(1)} back={() => setScreen('home')} />}</View>
     <View style={s.nav}>{([['home', 'home'], ['payments', 'receipt'], ['visitors', 'people'], ['community', 'chatbubble'], ['profile', 'person']] as const).map(([id, icon]) => <Pressable key={id} onPress={() => setScreen(id)} style={[s.navItem, screen === id && s.navActive]}><Ionicons name={icon} size={20} color={screen === id ? blue : '#fff'} /></Pressable>)}</View>
   </SafeAreaView>;

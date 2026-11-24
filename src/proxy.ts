@@ -5,6 +5,7 @@ import { reviewModeEnabled, reviewProxy } from '@/server/review-auth';
 import { nativeAuthEnabled } from '@/server/auth/mode';
 import { getSessionCookie } from 'better-auth/cookies';
 import { nativeApiRouteAllowed } from '@/server/auth/native-api-routes';
+import { archivedConstructionPath, constructionArchived } from '@/config/module-archive';
 
 /**
  * Proxy (Next 16 renamed Middleware → Proxy). OPTIMISTIC redirect only.
@@ -21,6 +22,13 @@ const clerkProxy = clerkMiddleware(async (auth, request) => {
 });
 
 export function proxy(request: NextRequest, event: Parameters<typeof clerkProxy>[1]): ReturnType<typeof clerkProxy> {
+  if (!websiteOnlyEnabled(process.env.PROPBREW_WEBSITE_ONLY, process.env.NODE_ENV)
+    && constructionArchived() && archivedConstructionPath(request.nextUrl.pathname)) {
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return new NextResponse('Construction is archived', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+    }
+    return NextResponse.redirect(new URL('/workspaces?archived=construction', request.url), 307);
+  }
   if (reviewModeEnabled()) return reviewProxy(request);
   const release = websiteReleaseDecision({
     flag: process.env.PROPBREW_WEBSITE_ONLY,
