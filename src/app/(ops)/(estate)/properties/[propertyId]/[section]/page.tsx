@@ -8,6 +8,8 @@ export const dynamic = 'force-dynamic';
 
 const sectionTabs = {
   operations: 'operations',
+  'asset-care': 'asset-care',
+  'building-services': 'building-services',
   'community-governance': 'community',
   'finance-commerce': 'finance',
   intelligence: 'intelligence',
@@ -21,6 +23,7 @@ export default async function EstatePropertySectionPage({ params }: { params: Pr
     if (!defaultSection) notFound();
     const { property, permissions } = readEstatePropertyOperating(actor, propertyId);
     if (!property) notFound();
+    if ((section === 'asset-care' || section === 'building-services') && !permissions.facility) notFound();
     return <PropertyOperatingHub property={property} permissions={permissions} defaultSection={defaultSection} />;
   });
 }

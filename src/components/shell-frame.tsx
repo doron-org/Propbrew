@@ -38,6 +38,9 @@ function propertyNavigation(actor: Actor): NavGroup[] {
 
   const operationItems = (siteId: string): NavItem[] => [
     can(actor, 'work_orders', 'read').allowed ? { id: `property-${siteId}-work-orders`, label: 'Work orders', href: scopedHref('/estate/work-orders', siteId), icon: 'wrench' as const, capability: 'work_orders' as const } : null,
+    canEnterWorkspace(actor, 'facility') && can(actor, 'work_orders', 'read').allowed ? { id: `property-${siteId}-maintenance-orders`, label: 'Maintenance work orders', href: scopedWorkspaceHref('/work-orders', 'siteId', siteId, `/properties/${siteId}`), icon: 'wrench' as const, capability: 'work_orders' as const } : null,
+    canEnterWorkspace(actor, 'facility') && can(actor, 'work_orders', 'read').allowed ? { id: `property-${siteId}-field`, label: 'Field jobs', href: scopedWorkspaceHref('/field', 'siteId', siteId, `/properties/${siteId}`), icon: 'checks' as const, capability: 'work_orders' as const } : null,
+    canEnterWorkspace(actor, 'facility') && can(actor, 'work_orders', 'read').allowed ? { id: `property-${siteId}-vendors`, label: 'Vendors & contractors', href: scopedWorkspaceHref('/vendors', 'siteId', siteId, `/properties/${siteId}`), icon: 'truck' as const, capability: 'work_orders' as const } : null,
     can(actor, 'inspections_compliance', 'read').allowed ? { id: `property-${siteId}-inspections`, label: 'Inspections & compliance', href: scopedHref('/estate/inspections', siteId), icon: 'checks' as const, capability: 'inspections_compliance' as const } : null,
     can(actor, 'announcements', 'read').allowed ? { id: `property-${siteId}-community-pulse`, label: 'Community pulse', href: scopedHref('/community', siteId), icon: 'trending' as const, capability: 'announcements' as const } : null,
     can(actor, 'bookings_amenities', 'read').allowed ? { id: `property-${siteId}-bookings`, label: 'Bookings', href: scopedHref('/bookings', siteId), icon: 'calendar' as const, capability: 'bookings_amenities' as const } : null,
@@ -64,14 +67,16 @@ function propertyNavigation(actor: Actor): NavGroup[] {
     can(actor, 'charges_invoicing', 'read').allowed ? { id: `property-${siteId}-finance-centre`, label: 'Finance centre', href: scopedHref('/finance', siteId), icon: 'banknote' as const, capability: 'charges_invoicing' as const } : null,
     can(actor, 'reports_analytics', 'read').allowed ? { id: `property-${siteId}-reports`, label: 'Reports', href: scopedHref('/reports', siteId), icon: 'trending' as const, capability: 'reports_analytics' as const } : null,
     can(actor, 'reports_analytics', 'read').allowed ? { id: `property-${siteId}-copilot`, label: 'Ask Copilot', href: scopedHref('/estate/copilot', siteId), icon: 'sparkles' as const, capability: 'reports_analytics' as const } : null,
+    canEnterWorkspace(actor, 'facility') ? { id: `property-${siteId}-control-center`, label: 'Building control centre', href: scopedWorkspaceHref('/control-center', 'siteId', siteId, `/properties/${siteId}`), icon: 'gauge' as const, capability: 'assets_ppm' as const } : null,
+    canEnterWorkspace(actor, 'facility') ? { id: `property-${siteId}-facility-copilot`, label: 'Ask building Copilot', href: scopedWorkspaceHref('/copilot', 'siteId', siteId, `/properties/${siteId}`), icon: 'sparkles' as const, capability: 'assets_ppm' as const } : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
 
   const facilityItems = (siteId: string, section: 'asset-care' | 'building-services'): NavItem[] => {
-    const hub = `/facility/sites/${encodeURIComponent(siteId)}`;
+    const hub = `/properties/${encodeURIComponent(siteId)}`;
     const link = (href: string) => scopedWorkspaceHref(href, 'siteId', siteId, hub);
     const entries: Array<[string, string, string, NavItem['icon'], Capability]> = section === 'asset-care'
       ? [['assets', 'Asset register', '/assets', 'boxes', 'assets_ppm'], ['ppm', 'Maintenance plans', '/ppm', 'calendar', 'assets_ppm'], ['facility-inspections', 'Facility inspections', '/inspections', 'clipboard', 'inspections_compliance'], ['inventory', 'Inventory', '/inventory', 'package', 'assets_ppm']]
-      : [['energy', 'Energy & utilities', '/energy', 'trending', 'assets_ppm'], ['safety', 'Safety & permits', '/safety', 'shield', 'assets_ppm'], ['access', 'Access & visitors', '/access', 'users', 'assets_ppm'], ['contracts', 'Contracts & SLAs', '/contracts', 'scroll', 'assets_ppm']];
+      : [['energy', 'Energy & utilities', '/energy', 'trending', 'assets_ppm'], ['safety', 'Safety & permits', '/safety', 'shield', 'assets_ppm'], ['access', 'Access & visitors', '/access', 'users', 'assets_ppm'], ['spaces', 'Spaces', '/spaces', 'grid', 'assets_ppm'], ['contracts', 'Contracts & SLAs', '/contracts', 'scroll', 'assets_ppm'], ['sustainability', 'Sustainability', '/sustainability', 'trending', 'assets_ppm']];
     return entries.filter(([, , , , capability]) => can(actor, capability, 'read').allowed).map(([id, label, href, icon, capability]) => ({ id: `property-${siteId}-${id}`, label, href: link(href), icon, capability }));
   };
 
@@ -83,8 +88,8 @@ function propertyNavigation(actor: Actor): NavGroup[] {
       items: [
         { id: `property-${site.id}-dashboard`, label: 'Dashboard', href: `/properties/${encodeURIComponent(site.id)}`, icon: 'gauge' as const, capability: 'assets_ppm' as const },
         sectionCapabilities.operations ? { id: `property-${site.id}-operations`, label: 'Operations', href: `/properties/${encodeURIComponent(site.id)}/operations`, icon: 'wrench' as const, capability: sectionCapabilities.operations, children: operationItems(site.id) } : null,
-        canEnterWorkspace(actor, 'facility') ? { id: `property-${site.id}-asset-care`, label: 'Asset care', href: `/facility/sites/${encodeURIComponent(site.id)}/asset-care`, icon: 'boxes' as const, capability: 'assets_ppm' as const, children: facilityItems(site.id, 'asset-care') } : null,
-        canEnterWorkspace(actor, 'facility') ? { id: `property-${site.id}-building-services`, label: 'Building services', href: `/facility/sites/${encodeURIComponent(site.id)}/building-services`, icon: 'building' as const, capability: 'assets_ppm' as const, children: facilityItems(site.id, 'building-services') } : null,
+        canEnterWorkspace(actor, 'facility') ? { id: `property-${site.id}-asset-care`, label: 'Asset care', href: `/properties/${encodeURIComponent(site.id)}/asset-care`, icon: 'boxes' as const, capability: 'assets_ppm' as const, children: facilityItems(site.id, 'asset-care') } : null,
+        canEnterWorkspace(actor, 'facility') ? { id: `property-${site.id}-building-services`, label: 'Building services', href: `/properties/${encodeURIComponent(site.id)}/building-services`, icon: 'building' as const, capability: 'assets_ppm' as const, children: facilityItems(site.id, 'building-services') } : null,
         sectionCapabilities.community ? { id: `property-${site.id}-community`, label: 'Community & governance', href: `/properties/${encodeURIComponent(site.id)}/community-governance`, icon: 'users' as const, capability: sectionCapabilities.community, children: communityItems(site.id) } : null,
         sectionCapabilities.finance ? { id: `property-${site.id}-finance`, label: 'Finance & commerce', href: `/properties/${encodeURIComponent(site.id)}/finance-commerce`, icon: 'banknote' as const, capability: sectionCapabilities.finance, children: financeItems(site.id) } : null,
         sectionCapabilities.intelligence ? { id: `property-${site.id}-intelligence`, label: 'Intelligence', href: `/properties/${encodeURIComponent(site.id)}/intelligence`, icon: 'sparkles' as const, capability: sectionCapabilities.intelligence, children: intelligenceItems(site.id) } : null,

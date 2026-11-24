@@ -33,7 +33,9 @@ export type PropertyHubPermission =
   | 'security'
   | 'billing'
   | 'marketplace'
-  | 'reports';
+  | 'reports'
+  | 'facility'
+  | 'facilityInspections';
 
 type HubTool = {
   label: string;
@@ -41,6 +43,7 @@ type HubTool = {
   href: string;
   permission: PropertyHubPermission;
   icon: typeof Building2;
+  scope?: 'site';
 };
 
 const tools = {
@@ -70,11 +73,26 @@ const tools = {
     { label: 'Reports', description: 'Property KPIs, operational performance and exports.', href: '/reports', permission: 'reports', icon: ChartNoAxesCombined },
     { label: 'Ask Copilot', description: 'Permission-aware AI answers grounded in this property’s records.', href: '/estate/copilot', permission: 'reports', icon: Sparkles },
   ] satisfies HubTool[],
+  assetCare: [
+    { label: 'Asset register', description: 'Building equipment, condition and service history.', href: '/assets', permission: 'facility', icon: Building2, scope: 'site' },
+    { label: 'Maintenance plans', description: 'Preventive schedules and service triggers.', href: '/ppm', permission: 'facility', icon: CalendarDays, scope: 'site' },
+    { label: 'Facility inspections', description: 'Technical compliance evidence and follow-up.', href: '/inspections', permission: 'facilityInspections', icon: ClipboardCheck, scope: 'site' },
+    { label: 'Inventory', description: 'Spares and stock movements.', href: '/inventory', permission: 'facility', icon: PackageCheck, scope: 'site' },
+  ] satisfies HubTool[],
+  buildingServices: [
+    { label: 'Energy & utilities', description: 'Grid, generators, diesel and water.', href: '/energy', permission: 'facility', icon: ChartNoAxesCombined, scope: 'site' },
+    { label: 'Safety & permits', description: 'Building permits and incident records.', href: '/safety', permission: 'facility', icon: ShieldCheck, scope: 'site' },
+    { label: 'Access & visitors', description: 'Gates, passes and access events.', href: '/access', permission: 'facility', icon: Users, scope: 'site' },
+    { label: 'Spaces', description: 'Buildings, floors and managed spaces.', href: '/spaces', permission: 'facility', icon: Building2, scope: 'site' },
+    { label: 'Contracts & SLAs', description: 'Supplier obligations and renewals.', href: '/contracts', permission: 'facility', icon: FileText, scope: 'site' },
+    { label: 'Sustainability', description: 'Utility and environmental performance.', href: '/sustainability', permission: 'facility', icon: ChartNoAxesCombined, scope: 'site' },
+  ] satisfies HubTool[],
 };
 
-function scopedHref(href: string, property: EstatePropertySummary) {
-  const query = new URLSearchParams({ propertyId: property.id, returnTo: `/properties/${property.id}` });
-  return `${href}?${query.toString()}`;
+function scopedHref(entry: HubTool, property: EstatePropertySummary) {
+  const scope: Record<string, string> = entry.scope === 'site' ? { siteId: property.id } : { propertyId: property.id };
+  const query = new URLSearchParams({ ...scope, returnTo: `/properties/${property.id}` });
+  return `${entry.href}?${query.toString()}`;
 }
 
 function ToolGrid({ entries, property, permissions }: { entries: HubTool[]; property: EstatePropertySummary; permissions: Record<PropertyHubPermission, boolean> }) {
@@ -82,7 +100,7 @@ function ToolGrid({ entries, property, permissions }: { entries: HubTool[]; prop
   if (!visible.length) return <div className={styles.empty}><ShieldCheck size={22} /><h3>No tools are assigned to this role</h3><p>Ask a company administrator to update your property and role access.</p></div>;
   return <div className={styles.toolGrid}>{visible.map((entry) => {
     const Icon = entry.icon;
-    return <Link key={entry.label} className={styles.toolCard} href={scopedHref(entry.href, property)}>
+    return <Link key={entry.label} className={styles.toolCard} href={scopedHref(entry, property)}>
       <span className={styles.toolIcon}><Icon size={19} aria-hidden="true" /></span>
       <span className={styles.toolCopy}><strong>{entry.label}</strong><small>{entry.description}</small></span>
       <ArrowUpRight size={17} aria-hidden="true" />
@@ -107,7 +125,7 @@ export function PropertyOperatingHub({ property, permissions, defaultSection = '
     <Link className={styles.back} href="/properties"><ArrowLeft size={15} />All properties</Link>
     <header className={styles.hero}>
       <div className={styles.heroIdentity}><span><Building2 size={26} /></span><div><p>Property operating hub</p><h1>{property.name}</h1><small>{property.address || 'Address not recorded'}</small></div></div>
-      <div className={styles.heroScope}><ShieldCheck size={14} /><span>Every tool below is scoped to this property and your assigned access.</span></div>
+      <div className={styles.heroScope}><ShieldCheck size={14} /><span>Tools open in this property context, subject to your assigned access.</span></div>
     </header>
 
     <section className={styles.metrics} aria-label={`${property.name} summary`}>
@@ -122,6 +140,8 @@ export function PropertyOperatingHub({ property, permissions, defaultSection = '
       { id: 'tenancy', label: 'Tenancy', content: <section className={styles.panel}><header className={styles.panelHeader}><div><p>Property tenancy</p><h2>Agreements and tenancy lifecycle</h2></div></header><ToolGrid entries={[tenancyTool]} property={property} permissions={permissions} /></section> },
     ]} /> : null}
     {defaultSection === 'operations' ? <section className={styles.panel}><header className={styles.panelHeader}><div><p>Estate operations</p><h2>Run this property</h2></div><span>{tools.operations.filter((entry) => permissions[entry.permission]).length} workflows in the Operations rail menu</span></header><div className={styles.empty}><Wrench size={22} /><h3>Choose a workflow from Operations</h3><p>Expand Operations in the property rail to open work orders, inspections, bookings, security and resident services.</p></div></section> : null}
+    {defaultSection === 'asset-care' ? <section className={styles.panel}><header className={styles.panelHeader}><div><p>Building operations</p><h2>Asset care</h2></div></header><ToolGrid entries={tools.assetCare} property={property} permissions={permissions} /></section> : null}
+    {defaultSection === 'building-services' ? <section className={styles.panel}><header className={styles.panelHeader}><div><p>Building operations</p><h2>Building services</h2></div></header><ToolGrid entries={tools.buildingServices} property={property} permissions={permissions} /></section> : null}
     {defaultSection === 'community' ? <section className={styles.panel}><header className={styles.panelHeader}><div><p>Resident experience</p><h2>Community and governance</h2></div><span>{tools.community.filter((entry) => permissions[entry.permission]).length} workflows in the rail menu</span></header><div className={styles.empty}><Users size={22} /><h3>Choose a community workflow</h3><p>Expand Community & governance in the property rail to open announcements, governance, committee, rewards and documents.</p></div></section> : null}
     {defaultSection === 'finance' ? <section className={styles.panel}><header className={styles.panelHeader}><div><p>Property commercial</p><h2>Finance and commerce</h2></div><span>{tools.finance.filter((entry) => permissions[entry.permission]).length} workflows in the rail menu</span></header><div className={styles.empty}><Banknote size={22} /><h3>Choose a finance workflow</h3><p>Expand Finance & commerce in the property rail to open billing, collections and marketplace operations.</p></div></section> : null}
     {defaultSection === 'intelligence' ? <section className={styles.panel}><header className={styles.panelHeader}><div><p>Decision support</p><h2>Reports and AI intelligence</h2></div><span>{tools.intelligence.filter((entry) => permissions[entry.permission]).length} workflows in the rail menu</span></header><div className={styles.empty}><Sparkles size={22} /><h3>Choose an intelligence workflow</h3><p>Expand Intelligence in the property rail to open finance insights, reports and the property-aware AI copilot.</p></div></section> : null}

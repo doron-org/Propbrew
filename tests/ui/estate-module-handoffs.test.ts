@@ -74,6 +74,11 @@ describe('Estate notification navigation context', () => {
     expect(workspace).toMatchObject({ home: '/property-management', name: 'Property Management' });
     expect(groups.map((group) => group.label)).toEqual(['Property management', 'Lagos Gardens', 'Tower Plant · Facilities']);
     expect(groups[1].items.map((item) => item.label)).toContain('Asset care');
+    const propertyItems = groups[1].items;
+    expect(propertyItems.find((item) => item.label === 'Asset care')?.href).toBe('/properties/estate-1/asset-care');
+    expect(propertyItems.find((item) => item.label === 'Building services')?.children?.map((item) => item.label)).toEqual(expect.arrayContaining(['Spaces', 'Sustainability']));
+    expect(propertyItems.find((item) => item.label === 'Operations')?.children?.map((item) => item.label)).toEqual(expect.arrayContaining(['Field jobs', 'Vendors & contractors']));
+    expect(propertyItems.find((item) => item.label === 'Intelligence')?.children?.map((item) => item.label)).toContain('Ask building Copilot');
     expect(groups[2].items.map((item) => item.label)).toContain('Building services');
   });
 
