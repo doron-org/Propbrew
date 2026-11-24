@@ -28,7 +28,7 @@ const keyFor = (tenantId: string, id: string) => JSON.stringify([tenantId, id]);
  *  maintained once and shared with the Estate module. Sites come scoped; the
  *  buildings/units are filtered to those sites, and resident names are attached
  *  only if the actor may read them (§7). */
-export default async function SpacesPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<PropertyQuery> }) {
+export default async function SpacesPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
   const site = selectedProperty(actor, await searchParams);

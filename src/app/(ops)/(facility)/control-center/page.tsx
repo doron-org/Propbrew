@@ -13,7 +13,7 @@ import { allPropertyRows, atProperty, selectedProperty, type PropertyQuery } fro
 /** Facility Control Center — a live building-operations command centre. Composite
  *  site health, live sensors (water/fuel/temp/power/occupancy), building-system
  *  status, and an active-alarm feed where one tap dispatches a work order. */
-export default async function ControlCenterPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<PropertyQuery> } = {}) {
+export default async function ControlCenterPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
   const site = selectedProperty(actor, await searchParams);

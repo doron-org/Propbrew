@@ -26,7 +26,7 @@ const keyFor = (tenantId: string, id: string) => JSON.stringify([tenantId, id]);
 /** My Day — the field technician's mobile-first job list. Their own assigned work
  *  (scoped to assigned_to_me), grouped On now / Up next / Waiting / Done, with big
  *  tap targets that fire the real §10 work-order transitions and live SLA counts. */
-export default async function FieldPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<PropertyQuery> }) {
+export default async function FieldPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('work_orders', 'read', 'facility');
   const site = selectedProperty(actor, await searchParams);

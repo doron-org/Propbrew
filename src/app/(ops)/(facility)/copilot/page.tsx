@@ -16,7 +16,7 @@ import { canEnterWorkspace } from '@/config/workspaces';
  *  inventory, contracts, permits, incidents) and fuses them into one ranked list
  *  of actionable priorities, plus a real AI conversation. Actions
  *  fire the real facility mutations (dispatch WO, refuel, receive stock, ack). */
-export default async function CopilotPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<PropertyQuery> }) {
+export default async function CopilotPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
   const site = selectedProperty(actor, await searchParams);
