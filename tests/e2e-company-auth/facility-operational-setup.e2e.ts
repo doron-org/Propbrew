@@ -29,7 +29,8 @@ test('a fresh company operates asset maintenance, exact stock movements and evid
   await page.getByLabel('Password', { exact: true }).fill('Disposable facility operations browser passphrase 2026!');
   await page.getByRole('button', { name: 'Create account & company', exact: true }).click();
   await expect(page).toHaveURL(/\/onboarding$/); await page.getByRole('link', { name: 'Set up later', exact: true }).click();
-  await expect(page).toHaveURL(/\/workspaces$/); await page.getByRole('link', { name: 'Enter Facility workspace', exact: true }).click();
+  await expect(page).toHaveURL(/\/workspaces$/); await page.getByRole('link', { name: 'Enter Property Management workspace', exact: true }).click();
+  await page.goto('/facility');
   await page.goto('/spaces');
   const property = page.getByRole('dialog', { name: 'Add facility site', exact: true });
   await openDialog(page.getByRole('button', { name: 'Add facility site', exact: true }), property);

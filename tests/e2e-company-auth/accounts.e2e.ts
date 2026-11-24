@@ -17,18 +17,20 @@ async function createAccount(page: Page, name: string, email: string, company?: 
   await expect(page.getByRole('heading', { name: 'Choose your workspace', exact: true })).toBeVisible();
 }
 
-test('native signup, all four portals, property and tenant save, logout and login preserve company records', async ({ page }) => {
+test('native signup, active workspaces, property and tenant save, logout and login preserve company records', async ({ page }) => {
   const id = randomUUID().slice(0, 8);
   const email = `owner-${id}@example.test`, property = `Browser property ${id}`, tenant = `Browser resident ${id}`;
   await page.goto('/sign-up');
   await createAccount(page, 'Disposable Lagos Owner', email, `Browser company ${id}`);
-  for (const workspace of ['Estate', 'Facility', 'Shortlet', 'Construction']) await expect(page.getByRole('link', { name: `Enter ${workspace} workspace`, exact: true })).toBeVisible();
-  for (const workspace of ['Facility', 'Shortlet', 'Construction']) {
+  for (const workspace of ['Property Management', 'Shortlet', 'Construction']) await expect(page.getByRole('link', { name: `Enter ${workspace} workspace`, exact: true })).toBeVisible();
+  for (const workspace of ['Shortlet', 'Construction']) {
     await page.getByRole('link', { name: `Enter ${workspace} workspace`, exact: true }).click();
     await expect(page.getByRole('navigation', { name: `${workspace} navigation`, exact: true })).toBeVisible();
     await page.goto('/workspaces');
   }
-  await page.getByRole('link', { name: 'Enter Estate workspace', exact: true }).click();
+  await page.getByRole('link', { name: 'Enter Property Management workspace', exact: true }).click();
+  await expect(page.getByRole('navigation', { name: 'Property Management navigation', exact: true })).toBeVisible();
+  await page.goto('/estate');
   await page.getByRole('button', { name: 'Add property', exact: true }).click();
   const propertyDialog = page.getByRole('dialog', { name: 'Add property', exact: true });
   await propertyDialog.getByLabel('Property name', { exact: true }).fill(property);
@@ -86,10 +88,15 @@ test('a private invitation creates a teammate account in the existing company wi
     await teammate.goto(inviteUrl);
     await teammate.getByRole('link', { name: 'Create an account', exact: true }).click();
     await createAccount(teammate, 'Disposable Estate Viewer', email);
-    await expect(teammate.getByRole('link', { name: 'Enter Estate workspace', exact: true })).toBeVisible();
-    for (const workspace of ['Facility', 'Shortlet', 'Construction']) await expect(teammate.getByRole('link', { name: `Enter ${workspace} workspace`, exact: true })).toHaveCount(0);
-    await teammate.getByRole('link', { name: 'Enter Estate workspace', exact: true }).click();
-    await expect(teammate.getByRole('button', { name: 'Add property', exact: true })).toHaveCount(0);
+    await expect(teammate.getByRole('link', { name: 'Enter Property Management workspace', exact: true })).toBeVisible();
+    for (const workspace of ['Shortlet', 'Construction']) await expect(teammate.getByRole('link', { name: `Enter ${workspace} workspace`, exact: true })).toHaveCount(0);
+    await teammate.getByRole('link', { name: 'Enter Property Management workspace', exact: true }).click();
+    await teammate.goto('/estate');
+    await teammate.getByRole('button', { name: 'Add property', exact: true }).click();
+    const restrictedProperty = teammate.getByRole('dialog', { name: 'Add property', exact: true });
+    await expect(restrictedProperty).toContainText('Property creation is restricted for this profile.');
+    await expect(restrictedProperty.getByLabel('Property name', { exact: true })).toHaveCount(0);
+    await restrictedProperty.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(teammate.getByRole('button', { name: 'Add tenant', exact: true })).toHaveCount(0);
     await teammate.goto('/construction');
     // Next may stream its outer response before the async page denies access.

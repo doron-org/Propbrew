@@ -24,7 +24,8 @@ test('a fresh company creates and persists invoices, recurring charges, tenancy 
   await expect(page).toHaveURL(/\/onboarding$/);
   await page.getByRole('link', { name: 'Set up later', exact: true }).click();
   await expect(page).toHaveURL(/\/workspaces$/);
-  await page.getByRole('link', { name: 'Enter Estate workspace', exact: true }).click();
+  await page.getByRole('link', { name: 'Enter Property Management workspace', exact: true }).click();
+  await page.goto('/estate');
 
   const property = page.getByRole('dialog', { name: 'Add property', exact: true });
   await openDialog(page.getByRole('button', { name: 'Add property', exact: true }), property);

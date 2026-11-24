@@ -4,8 +4,8 @@ import { openDialog } from './dialog';
 
 async function enterEstate(page: Page) {
   await page.goto('/login');
-  await page.getByRole('button', { name: /Explore demo:.*Estate/ }).click();
-  await expect(page).toHaveURL(/\/estate$/);
+  await page.getByRole('button', { name: /Explore demo:.*Property Management/ }).click();
+  await expect(page).toHaveURL(/\/property-management$/);
   await expect(page.getByRole('complementary', { name: 'Demo account notice' })).toHaveCount(0);
 }
 async function addProperty(page: Page, name: string) {

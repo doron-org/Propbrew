@@ -2,8 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { openDialog, selectTab } from './dialog';
 
 const workspaces = [
-  { module: 'estate', name: 'Estate', entry: '/sign-up' },
-  { module: 'facility', name: 'Facility', entry: '/login' },
+  { module: 'estate', name: 'Property Management', home: '/property-management', entry: '/sign-up' },
   { module: 'shortlet', name: 'Shortlet', entry: '/sign-up' },
   { module: 'construction', name: 'Construction', entry: '/login' },
 ] as const;
@@ -73,16 +72,21 @@ for (const workspace of workspaces) {
     await page.goto(workspace.entry);
     await assertDemoChoices(page);
     await page.getByRole('button', { name: new RegExp(`Explore demo:.*${workspace.name}`) }).click();
-    await expect(page).toHaveURL(new RegExp(`/${workspace.module}$`));
+    await expect(page).toHaveURL(new RegExp(`${'home' in workspace ? workspace.home : `/${workspace.module}`}$`));
     await expect(page.getByRole('navigation', { name: `${workspace.name} navigation`, exact: true })).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'Demo account notice', exact: true })).toHaveCount(0);
 
     if (workspace.module === 'estate') {
-      await page.getByRole('button', { name: 'Notifications', exact: true }).click();
-      await expect(page.getByText('You’re all caught up.', { exact: true })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Mark all read', exact: true })).toBeEnabled();
-      await page.getByRole('button', { name: 'Mark all read', exact: true }).click();
-      await page.getByRole('button', { name: 'Notifications', exact: true }).click();
+      await page.goto('/estate');
+      const markRead = page.getByRole('button', { name: 'Mark all read', exact: true });
+      await expect(async () => {
+        if (await markRead.isVisible()) return;
+        await page.getByRole('button', { name: /^Notifications(?:, \d+ unread)?$/ }).click();
+        await expect(markRead).toBeVisible({ timeout: 1_000 });
+      }).toPass({ timeout: 10_000 });
+      await expect(markRead).toBeEnabled();
+      await markRead.click();
+      await page.keyboard.press('Escape');
       await page.getByRole('button', { name: 'Messages', exact: true }).click();
       await expect(page.getByText('No conversations yet.', { exact: true })).toBeVisible();
       await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveCount(0);
@@ -91,7 +95,7 @@ for (const workspace of workspaces) {
       await expect(page.getByRole('button', { name: 'Add tenant', exact: true })).toBeEnabled();
       await page.goto('/properties');
       await expect(page.getByRole('table', { name: 'Property list', exact: true })).toContainText('Lekki Gardens Estate');
-    } else if (workspace.module === 'facility') {
+      await page.goto('/facility');
       // Sensor cards live under their own tab; the overview default does not list them.
       await selectTab(page.getByRole('tab', { name: /^Sensor readings(?: \d+)?$/ }), page.getByRole('tabpanel', { name: /^Sensor readings(?: \d+)?$/ }));
       await expect(page.getByRole('heading', { name: 'Diesel tank — Block C', exact: true })).toBeVisible();
