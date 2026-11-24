@@ -13,17 +13,19 @@ import { toneVar } from '@/lib/status-tones';
 import { PageTabs } from '@/components/ui/page-tabs';
 import { FileText, CalendarClock, Wallet, Gauge, ShieldAlert } from 'lucide-react';
 import { withDurableRead } from '@/server/data/durable-records';
+import { allPropertyRows, atProperty, selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
 
 
 /** Contracts & SLAs — service/AMC contracts with a renewal runway, SLA
  *  target-vs-actual, total commitment, and a coverage-gap radar (which system
  *  categories have no active contract). */
-export default async function ContractsPage() {
+export default async function ContractsPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
+  const site = selectedProperty(actor, await searchParams);
   const clock = operatingClock();
-  const contracts = repos.facilityContracts.list(actor).items;
-  const sites = new Map<string, string>(repos.sites.all(actor).map((s) => [s.id, s.name]));
+  const contracts = atProperty(allPropertyRows((cursor) => repos.facilityContracts.list(actor, { cursor, limit: 200 })), site);
+  const sites = new Map<string, string>(repos.sites.all(actor).filter((entry) => !site || entry.id === site.id).map((s) => [s.id, s.name]));
 
   const active = contracts.filter((c) => contractStatus(c, clock.nowMs).daysLeft >= 0);
   const expiring = contracts.filter((c) => { const d = contractStatus(c, clock.nowMs).daysLeft; return d >= 0 && d <= 45; });

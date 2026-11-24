@@ -70,7 +70,7 @@ describe('canonical property and tenant page readers', () => {
   it('shows a newly created scoped property, building, unit and resident in Spaces', async () => {
     const actor = actAs('facility_manager', { estateIds: ['new-site'] });
     db.sites.push(newSite()); db.buildings.push(newBuilding()); db.units.push(newUnit()); db.residents.push(newResident());
-    renderToStaticMarkup(await SpacesPage());
+    renderToStaticMarkup(await SpacesPage({ searchParams: Promise.resolve({}) }));
     const props = boundary.spaces.mock.calls[0][0] as unknown as { sites: Site[]; buildings: Building[]; units: (Unit & { residentName?: string })[] };
     expect(props.sites.map((site) => site.name)).toEqual(['New canonical property']);
     expect(props.buildings.map((building) => building.name)).toEqual(['New canonical building']);
@@ -81,7 +81,7 @@ describe('canonical property and tenant page readers', () => {
   it('does not leak newly created same-tenant unassigned or foreign property metadata', async () => {
     db.sites.push(newSite()); db.buildings.push(newBuilding()); db.units.push(newUnit()); db.residents.push(newResident());
     db.sites.push(newSite({ tenantId: asId<Site['tenantId']>('foreign-tenant'), id: asId<Site['id']>('foreign-site'), name: 'FOREIGN_SECRET' }));
-    renderToStaticMarkup(await SpacesPage());
+    renderToStaticMarkup(await SpacesPage({ searchParams: Promise.resolve({}) }));
     const props = boundary.spaces.mock.calls[0][0];
     const payload = JSON.stringify(props);
     expect(payload).not.toContain('New canonical');
@@ -147,7 +147,7 @@ describe('canonical property and tenant page readers', () => {
       db.units.push(newUnit({ id: asId<Unit['id']>(id), siteId: asId<Site['id']>(id), buildingId: asId<Building['id']>(id), label: `Unit ${index}` }));
       db.residents.push(newResident({ id: asId<Resident['id']>(id), userId: asId<Resident['userId']>(id), siteId: asId<Site['id']>(id), unitId: asId<Unit['id']>(id), name: `Resident ${index}` }));
     }
-    renderToStaticMarkup(await SpacesPage());
+    renderToStaticMarkup(await SpacesPage({ searchParams: Promise.resolve({}) }));
     renderToStaticMarkup(await PeoplePage());
     const spaces = boundary.spaces.mock.calls[0][0] as unknown as { sites: Site[]; buildings: Building[]; units: Unit[] };
     const people = boundary.people.mock.calls[0][0] as unknown as { residents: { name: string; unitLabel: string }[] };
@@ -162,7 +162,7 @@ describe('canonical property and tenant page readers', () => {
     db.sites.push(newSite()); db.units.push(newUnit());
     const existing = db.workOrders[0];
     db.workOrders.push({ ...existing, id: asId<WorkOrder['id']>('new-job'), ref: 'WO-NEW', tenantId: asId<WorkOrder['tenantId']>('t-lekki'), siteId: asId<Site['id']>('new-site'), estateId: asId<Site['id']>('new-site'), unitId: asId<Unit['id']>('new-unit'), assigneeUserId: asId<WorkOrder['assigneeUserId'] & string>(actor.userId) });
-    renderToStaticMarkup(await FieldPage());
+    renderToStaticMarkup(await FieldPage({ searchParams: Promise.resolve({}) }));
     const props = boundary.field.mock.calls[0][0] as unknown as { jobs: { ref: string; location: string }[]; techName: string };
     expect(props.jobs).toMatchObject([{ ref: 'WO-NEW', location: 'New canonical unit' }]);
     expect(props.techName).toBe('Emeka');
@@ -172,7 +172,7 @@ describe('canonical property and tenant page readers', () => {
     actAs('vendor');
     const spies = [vi.spyOn(repos.sites, 'list'), vi.spyOn(repos.units, 'list'), vi.spyOn(repos.assets, 'list')];
     for (const spy of spies) spy.mockImplementation(() => { throw new Error('Forbidden asset read'); });
-    renderToStaticMarkup(await FieldPage());
+    renderToStaticMarkup(await FieldPage({ searchParams: Promise.resolve({}) }));
     for (const spy of spies) expect(spy).not.toHaveBeenCalled();
   });
 });

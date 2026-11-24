@@ -48,7 +48,7 @@ type HubTool = {
 
 const tools = {
   operations: [
-    { label: 'Work orders', description: 'Requests, assignments, vendors and resolution for this property.', href: '/estate/work-orders', permission: 'workOrders', icon: Wrench },
+    { label: 'Work orders', description: 'Resident requests and building maintenance in one register.', href: '/property-management/work-orders', permission: 'workOrders', icon: Wrench },
     { label: 'Inspections & compliance', description: 'Property inspections, obligations, evidence and follow-up.', href: '/estate/inspections', permission: 'inspections', icon: ClipboardCheck },
     { label: 'Community pulse', description: 'Resident sentiment, service signals and emerging risks.', href: '/community', permission: 'community', icon: ChartNoAxesCombined },
     { label: 'Bookings', description: 'Shared-space reservations and approval queues.', href: '/bookings', permission: 'bookings', icon: CalendarDays },
@@ -70,8 +70,9 @@ const tools = {
   ] satisfies HubTool[],
   intelligence: [
     { label: 'Finance centre', description: 'Property cash flow, reconciliation and executive finance view.', href: '/finance', permission: 'billing', icon: Banknote },
-    { label: 'Reports', description: 'Property KPIs, operational performance and exports.', href: '/reports', permission: 'reports', icon: ChartNoAxesCombined },
-    { label: 'Ask Copilot', description: 'Permission-aware AI answers grounded in this property’s records.', href: '/estate/copilot', permission: 'reports', icon: Sparkles },
+    { label: 'Property performance', description: 'Estate and building operations in one report.', href: '/property-management/reports', permission: 'reports', icon: ChartNoAxesCombined },
+    { label: 'Ask Property Copilot', description: 'Permission-aware AI across this property’s records.', href: '/property-management/copilot', permission: 'reports', icon: Sparkles },
+    { label: 'Building priority actions', description: 'Review operational signals and proposed actions.', href: '/copilot', permission: 'facility', icon: Sparkles, scope: 'site' },
   ] satisfies HubTool[],
   assetCare: [
     { label: 'Asset register', description: 'Building equipment, condition and service history.', href: '/assets', permission: 'facility', icon: Building2, scope: 'site' },

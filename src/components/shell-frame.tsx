@@ -31,14 +31,13 @@ function propertyNavigation(actor: Actor): NavGroup[] {
     operations: firstReadable(actor, ['work_orders', 'inspections_compliance', 'bookings_amenities', 'security_sos']),
     community: firstReadable(actor, ['announcements']),
     finance: firstReadable(actor, ['charges_invoicing', 'marketplace']),
-    intelligence: firstReadable(actor, ['reports_analytics']),
+    intelligence: firstReadable(actor, ['reports_analytics', 'assets_ppm']),
   };
 
   const scopedHref = (href: string, siteId: string) => `${href}?${new URLSearchParams({ propertyId: siteId, returnTo: `/properties/${siteId}` }).toString()}`;
 
   const operationItems = (siteId: string): NavItem[] => [
-    can(actor, 'work_orders', 'read').allowed ? { id: `property-${siteId}-work-orders`, label: 'Work orders', href: scopedHref('/estate/work-orders', siteId), icon: 'wrench' as const, capability: 'work_orders' as const } : null,
-    canEnterWorkspace(actor, 'facility') && can(actor, 'work_orders', 'read').allowed ? { id: `property-${siteId}-maintenance-orders`, label: 'Maintenance work orders', href: scopedWorkspaceHref('/work-orders', 'siteId', siteId, `/properties/${siteId}`), icon: 'wrench' as const, capability: 'work_orders' as const } : null,
+    can(actor, 'work_orders', 'read').allowed ? { id: `property-${siteId}-work-orders`, label: 'Work orders', href: scopedHref('/property-management/work-orders', siteId), icon: 'wrench' as const, capability: 'work_orders' as const } : null,
     canEnterWorkspace(actor, 'facility') && can(actor, 'work_orders', 'read').allowed ? { id: `property-${siteId}-field`, label: 'Field jobs', href: scopedWorkspaceHref('/field', 'siteId', siteId, `/properties/${siteId}`), icon: 'checks' as const, capability: 'work_orders' as const } : null,
     canEnterWorkspace(actor, 'facility') && can(actor, 'work_orders', 'read').allowed ? { id: `property-${siteId}-vendors`, label: 'Vendors & contractors', href: scopedWorkspaceHref('/vendors', 'siteId', siteId, `/properties/${siteId}`), icon: 'truck' as const, capability: 'work_orders' as const } : null,
     can(actor, 'inspections_compliance', 'read').allowed ? { id: `property-${siteId}-inspections`, label: 'Inspections & compliance', href: scopedHref('/estate/inspections', siteId), icon: 'checks' as const, capability: 'inspections_compliance' as const } : null,
@@ -65,10 +64,10 @@ function propertyNavigation(actor: Actor): NavGroup[] {
 
   const intelligenceItems = (siteId: string): NavItem[] => [
     can(actor, 'charges_invoicing', 'read').allowed ? { id: `property-${siteId}-finance-centre`, label: 'Finance centre', href: scopedHref('/finance', siteId), icon: 'banknote' as const, capability: 'charges_invoicing' as const } : null,
-    can(actor, 'reports_analytics', 'read').allowed ? { id: `property-${siteId}-reports`, label: 'Reports', href: scopedHref('/reports', siteId), icon: 'trending' as const, capability: 'reports_analytics' as const } : null,
-    can(actor, 'reports_analytics', 'read').allowed ? { id: `property-${siteId}-copilot`, label: 'Ask Copilot', href: scopedHref('/estate/copilot', siteId), icon: 'sparkles' as const, capability: 'reports_analytics' as const } : null,
+    sectionCapabilities.intelligence ? { id: `property-${siteId}-reports`, label: 'Property performance', href: scopedHref('/property-management/reports', siteId), icon: 'trending' as const, capability: sectionCapabilities.intelligence } : null,
+    sectionCapabilities.intelligence ? { id: `property-${siteId}-copilot`, label: 'Ask Property Copilot', href: scopedHref('/property-management/copilot', siteId), icon: 'sparkles' as const, capability: sectionCapabilities.intelligence } : null,
     canEnterWorkspace(actor, 'facility') ? { id: `property-${siteId}-control-center`, label: 'Building control centre', href: scopedWorkspaceHref('/control-center', 'siteId', siteId, `/properties/${siteId}`), icon: 'gauge' as const, capability: 'assets_ppm' as const } : null,
-    canEnterWorkspace(actor, 'facility') ? { id: `property-${siteId}-facility-copilot`, label: 'Ask building Copilot', href: scopedWorkspaceHref('/copilot', 'siteId', siteId, `/properties/${siteId}`), icon: 'sparkles' as const, capability: 'assets_ppm' as const } : null,
+    canEnterWorkspace(actor, 'facility') ? { id: `property-${siteId}-building-priorities`, label: 'Building priority actions', href: scopedWorkspaceHref('/copilot', 'siteId', siteId, `/properties/${siteId}`), icon: 'sparkles' as const, capability: 'assets_ppm' as const } : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
 
   const facilityItems = (siteId: string, section: 'asset-care' | 'building-services'): NavItem[] => {
@@ -161,10 +160,10 @@ function facilitySiteNavigation(actor: Actor): NavGroup[] {
     const entry = (id: string, label: string, href: string, icon: NavItem['icon'], capability: Capability = 'assets_ppm'): NavItem => ({ id: `facility-${siteId}-${id}`, label, href: link(href), icon, capability });
     return { label: `${site.name} · Facilities`, collapsible: true, items: [
       { id: `facility-${siteId}-dashboard`, label: 'Site dashboard', href: hub, icon: 'gauge', capability: 'assets_ppm' },
-      { id: `facility-${siteId}-operations`, label: 'Operations', href: `${hub}/operations`, icon: 'wrench', capability: 'work_orders', children: [entry('work-orders', 'Work orders', '/work-orders', 'wrench', 'work_orders'), entry('field', 'Mobile jobs', '/field', 'checks', 'work_orders'), entry('vendors', 'Vendors & contractors', '/vendors', 'truck', 'work_orders')] },
+      { id: `facility-${siteId}-operations`, label: 'Operations', href: `${hub}/operations`, icon: 'wrench', capability: 'work_orders', children: [entry('work-orders', 'Work orders', '/property-management/work-orders', 'wrench', 'work_orders'), entry('field', 'Mobile jobs', '/field', 'checks', 'work_orders'), entry('vendors', 'Vendors & contractors', '/vendors', 'truck', 'work_orders')] },
       { id: `facility-${siteId}-asset-care`, label: 'Asset care', href: `${hub}/asset-care`, icon: 'boxes', capability: 'assets_ppm', children: [entry('assets', 'Asset register', '/assets', 'boxes'), entry('ppm', 'Maintenance plans', '/ppm', 'calendar'), entry('inspections', 'Inspections & compliance', '/inspections', 'clipboard', 'inspections_compliance'), entry('inventory', 'Inventory', '/inventory', 'package')] },
       { id: `facility-${siteId}-services`, label: 'Building services', href: `${hub}/building-services`, icon: 'building', capability: 'assets_ppm', children: [entry('energy', 'Energy & utilities', '/energy', 'trending'), entry('safety', 'Safety & permits', '/safety', 'shield'), entry('access', 'Access & visitors', '/access', 'users'), entry('spaces', 'Spaces', '/spaces', 'grid'), entry('contracts', 'Contracts & SLAs', '/contracts', 'scroll')] },
-      { id: `facility-${siteId}-intelligence`, label: 'Intelligence', href: `${hub}/intelligence`, icon: 'sparkles', capability: 'assets_ppm', children: [entry('control', 'Control centre', '/control-center', 'gauge'), entry('copilot', 'Ask facility Copilot', '/copilot', 'sparkles')] },
+      { id: `facility-${siteId}-intelligence`, label: 'Intelligence', href: `${hub}/intelligence`, icon: 'sparkles', capability: 'assets_ppm', children: [entry('control', 'Control centre', '/control-center', 'gauge'), entry('reports', 'Property performance', '/property-management/reports', 'trending'), entry('copilot', 'Ask Property Copilot', '/property-management/copilot', 'sparkles'), entry('priorities', 'Building priority actions', '/copilot', 'sparkles')] },
     ] };
   });
 }

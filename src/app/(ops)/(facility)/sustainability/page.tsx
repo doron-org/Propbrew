@@ -5,16 +5,28 @@ import { repos } from '@/server/data';
 import { gridReliancePct, co2Kg, esgScore, reductionScenarios } from '@/domain/facility';
 import { SustainabilityWorkspace, type MonthPoint } from '@/components/facility/sustainability-workspace';
 import { withDurableRead } from '@/server/data/durable-records';
+import { allPropertyRows, selectedProperty, atProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
+import { Card, KpiCard } from '@/components/ui';
+import Link from 'next/link';
 
 /** Sustainability — Nigeria-first ESG: diesel carbon, grid-vs-genset mix, water,
  *  a 6-month carbon trend, modelled reduction pathways (solar/service/LED/gas with
  *  CO₂, ₦ savings and payback), and editable reduction targets. */
-export default async function SustainabilityPage() {
+export default async function SustainabilityPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
-  const generators = repos.facilityGenerators.list(actor).items;
-  const months = repos.emissionMonths.list(actor).items;
-  const targets = repos.sustainabilityTargets.list(actor).items;
+  const site = selectedProperty(actor, await searchParams);
+  const generators = atProperty(allPropertyRows((cursor) => repos.facilityGenerators.list(actor, { cursor, limit: 200 })), site);
+  if (site) {
+    const litres = generators.reduce((sum, row) => sum + Math.round(row.runtimeHoursMonth * row.litresPerHour), 0);
+    return <div className="pb-page">
+      <PageHeader title={`${site.name} sustainability`} subtitle="Site-linked generator estimates; company-wide utility months and targets are not attributed to this property." />
+      <div className="grid gap-4 sm:grid-cols-2"><KpiCard label="Recorded generators" value={String(generators.length)} /><KpiCard label="Modelled diesel CO₂" value={`${co2Kg(litres).toLocaleString('en-NG')} kg`} /></div>
+      <Card><p>Monthly utility totals and sustainability targets do not yet have a property assignment. They remain in the <Link className="text-primary underline" href="/sustainability">company-wide sustainability view</Link> until site attribution is recorded.</p></Card>
+    </div>;
+  }
+  const months = allPropertyRows((cursor) => repos.emissionMonths.list(actor, { cursor, limit: 200 }));
+  const targets = allPropertyRows((cursor) => repos.sustainabilityTargets.list(actor, { cursor, limit: 200 }));
 
   const litresMonth = generators.reduce((n, g) => n + Math.round(g.runtimeHoursMonth * g.litresPerHour), 0);
   const reliance = gridReliancePct(generators);

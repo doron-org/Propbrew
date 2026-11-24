@@ -97,7 +97,7 @@ describe('Facility uses the Construction Ask Copilot reference', () => {
 
   it('uses shared verified streaming, duplicate protection and server-owned usage recording', () => {
     const text = source();
-    for (const value of ["endpoint: '/api/copilot', module: 'facility'", 'useCopilotStream', 'if (!query || asking || pending) return', 'if (exchange.usage?.recorded) router.refresh()', 'thread.map((message)', 'onStop={stop}', '<CopilotStreamReply']) expect(text).toContain(value);
+    for (const value of ["endpoint = '/api/copilot', module = 'facility'", 'useCopilotStream', 'if (!query || asking || pending) return', 'if (exchange.usage?.recorded) router.refresh()', 'thread.map((message)', 'onStop={stop}', '<CopilotStreamReply']) expect(text).toContain(value);
     expect(text).not.toContain('recordCopilotUsage(');
     expect(text).not.toContain('askCopilot(');
     const client = read('src/lib/ai/copilot-client.ts');

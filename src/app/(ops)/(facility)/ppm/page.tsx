@@ -10,15 +10,17 @@ import { MaintenanceWorkspace } from '@/components/ppm/maintenance-workspace';
 import type { PpmData } from '@/components/ppm/types';
 import { readFacilityMaintenanceSetup } from '@/server/reads/facility-maintenance';
 import { withDurableRead } from '@/server/data/durable-records';
+import { allPropertyRows, atProperty, selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
 
 /** FM-02 preventive maintenance + AI-F-01 predictive maintenance — a calendar-
  *  first workspace. Everything is computed from the actor's scoped repos, so the
  *  calendar, risk engine and runtime feeds never cross the estate/tenant
  *  boundary (§8.2). Modify actions are Facility-Manager-gated (assets_ppm = M);
  *  everyone else gets a read-only workspace. */
-export default async function PpmPage() {
+export default async function PpmPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
+  const site = selectedProperty(actor, await searchParams);
   const clock = operatingClock();
   const canMutate = effectiveLevel(actor, 'assets_ppm') === 'M' || effectiveLevel(actor, 'assets_ppm') === 'F';
 
@@ -27,16 +29,26 @@ export default async function PpmPage() {
   do { const page = repos.ppmPlans.list(actor, { limit: 500, cursor }); plans.push(...page.items); cursor = page.cursor; } while (cursor !== null);
   const occurrences: Array<ReturnType<typeof repos.ppmOccurrences.list>['items'][number]> = [];
   do { const page = repos.ppmOccurrences.list(actor, { limit: 500, cursor }); occurrences.push(...page.items); cursor = page.cursor; } while (cursor !== null);
-  const setup = readFacilityMaintenanceSetup(actor);
-  const nameById = new Map((setup?.assets ?? repos.assets.list(actor).items).map((a) => [String(a.id), a.name]));
+  const rawSetup = readFacilityMaintenanceSetup(actor);
+  const setup = rawSetup && site ? { ...rawSetup,
+    assets: rawSetup.assets.filter((row) => row.siteId === site.id),
+    plans: rawSetup.plans.filter((row) => row.siteId === site.id),
+    services: rawSetup.services.filter((row) => row.siteId === site.id),
+    archivedOccurrenceIds: rawSetup.archivedOccurrenceIds.filter((id) => occurrences.some((row) => row.id === id && row.siteId === site.id)),
+  } : rawSetup;
+  const visiblePlans = atProperty(plans, site);
+  const visibleOccurrences = atProperty(occurrences, site);
+  const visibleAssets = atProperty(allPropertyRows((cursor) => repos.assets.list(actor, { cursor, limit: 200 })), site);
+  const visibleAssetIds = new Set(visibleAssets.map((row) => String(row.id)));
+  const nameById = new Map((setup?.assets ?? allPropertyRows((cursor) => repos.assets.list(actor, { cursor, limit: 200 }))).map((a) => [String(a.id), a.name]));
 
   const data: PpmData = {
     setup,
     now: clock.dateISO,
     canMutate,
     weeklyCapacityHours: WEEKLY_CAPACITY_HOURS,
-    occurrences: occurrences.filter((row) => !setup?.archivedOccurrenceIds.includes(row.id) && (row.status === 'completed' || setup?.plans.find((p) => p.planId === String(row.planId))?.enabled !== false)).map((row) => !row.workOrderRef && ['scheduled', 'overdue'].includes(row.status) ? { ...row, status: row.dueDate < clock.dateISO ? 'overdue' as const : 'scheduled' as const } : row),
-    plans: plans.map((p) => ({
+    occurrences: visibleOccurrences.filter((row) => !setup?.archivedOccurrenceIds.includes(row.id) && (row.status === 'completed' || setup?.plans.find((p) => p.planId === String(row.planId))?.enabled !== false)).map((row) => !row.workOrderRef && ['scheduled', 'overdue'].includes(row.status) ? { ...row, status: row.dueDate < clock.dateISO ? 'overdue' as const : 'scheduled' as const } : row),
+    plans: visiblePlans.map((p) => ({
       id: String(p.id),
       assetId: String(p.assetId),
       assetName: p.assetName,
@@ -55,9 +67,9 @@ export default async function PpmPage() {
       nextDue: p.nextDue,
       rescheduleCount: p.rescheduleCount,
     })),
-    assessments: scoreAssets(actor),
-    runtime: runtimeForActor(actor).map((r) => ({ ...r, assetName: nameById.get(String(r.assetId)) ?? String(r.assetId) })),
-    gaps: coverageGaps(actor).map((a) => ({ id: String(a.id), name: a.name, category: a.category, locationLabel: a.locationLabel, status: a.status })),
+    assessments: scoreAssets(actor).filter((row) => visibleAssetIds.has(String(row.assetId))),
+    runtime: runtimeForActor(actor).filter((row) => visibleAssetIds.has(String(row.assetId))).map((r) => ({ ...r, assetName: nameById.get(String(r.assetId)) ?? String(r.assetId) })),
+    gaps: coverageGaps(actor).filter((row) => visibleAssetIds.has(String(row.id))).map((a) => ({ id: String(a.id), name: a.name, category: a.category, locationLabel: a.locationLabel, status: a.status })),
   };
 
   return (

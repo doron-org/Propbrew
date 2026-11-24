@@ -12,7 +12,7 @@ import type { WorkOrder, Invoice } from './entities';
 import { NOW_MS } from './ppm';
 
 export type Unit = 'count' | 'percent' | 'money';
-export type Dataset = { workOrders: readonly WorkOrder[]; invoices: readonly Invoice[] };
+export type Dataset = { workOrders: readonly WorkOrder[]; invoices: readonly Invoice[]; asOfMs?: number };
 export type Dimension = { id: string; label: string };
 export type Bar = { key: string; label: string; value: number };
 
@@ -47,7 +47,7 @@ export type Metric = {
   breakdown: (ds: Dataset, dim: string) => Bar[];
 };
 
-const breached = (w: WorkOrder) => OPEN(w) && w.resolveDueAt !== null && Date.parse(w.resolveDueAt) < NOW_MS;
+const breached = (w: WorkOrder, asOfMs: number) => OPEN(w) && w.resolveDueAt !== null && Date.parse(w.resolveDueAt) < asOfMs;
 
 export const METRICS: Metric[] = [
   {
@@ -66,8 +66,8 @@ export const METRICS: Metric[] = [
   },
   {
     id: 'sla_breaches', label: 'SLA breaches', unit: 'count', requirementIds: ['FM-05', 'FM-07'], dims: [{ id: 'priority', label: 'Priority' }, { id: 'estate', label: 'Estate' }],
-    value: (ds) => ds.workOrders.filter(breached).length,
-    breakdown: (ds, dim) => group(ds.workOrders.filter(breached), dim),
+    value: (ds) => ds.workOrders.filter((row) => breached(row, ds.asOfMs ?? NOW_MS)).length,
+    breakdown: (ds, dim) => group(ds.workOrders.filter((row) => breached(row, ds.asOfMs ?? NOW_MS)), dim),
   },
   {
     id: 'spend', label: 'Maintenance spend', unit: 'money', requirementIds: ['FM-07', 'EM-01'], dims: WO_DIMS, realTrend: true,
@@ -103,13 +103,13 @@ function invoiceGroup(rows: readonly Invoice[], dim: string, weight: (i: Invoice
 
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 
-/** Real weekly buckets of work-order creation ending at the demo clock. */
-export function weeklyThroughput(workOrders: readonly WorkOrder[], weeks = 10, weight: (w: WorkOrder) => number = () => 1): number[] {
+/** Real weekly buckets of work-order creation ending at the supplied reporting snapshot. */
+export function weeklyThroughput(workOrders: readonly WorkOrder[], weeks = 10, weight: (w: WorkOrder) => number = () => 1, asOfMs = NOW_MS): number[] {
   const out = new Array(weeks).fill(0);
   for (const w of workOrders) {
     const created = w.createdAt ? Date.parse(w.createdAt) : NaN;
     if (Number.isNaN(created)) continue;
-    const idx = weeks - 1 - Math.floor((NOW_MS - created) / WEEK_MS);
+    const idx = weeks - 1 - Math.floor((asOfMs - created) / WEEK_MS);
     if (idx >= 0 && idx < weeks) out[idx] += weight(w);
   }
   return out;
@@ -133,7 +133,7 @@ export function modelledTrend(seed: string, value: number, points = 10): number[
 export function metricTrend(metric: Metric, ds: Dataset): { points: number[]; real: boolean } {
   if (metric.realTrend) {
     const weight = metric.id === 'spend' ? (w: WorkOrder) => w.cost?.minor ?? 0 : undefined;
-    return { points: weeklyThroughput(ds.workOrders, 10, weight), real: true };
+    return { points: weeklyThroughput(ds.workOrders, 10, weight, ds.asOfMs ?? NOW_MS), real: true };
   }
   return { points: modelledTrend(metric.id, metric.value(ds)), real: false };
 }

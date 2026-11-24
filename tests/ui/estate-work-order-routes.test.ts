@@ -30,7 +30,7 @@ describe('Independent Estate work-order route ownership', () => {
     expect(PAGE_META['/estate/work-orders']).toBeDefined();
     expect(activeNavHref(nav, '/estate/work-orders/WO-24817')).toBe('/estate');
     expect(activeNavHref(nav, '/estate/work-orders-other')).toBe('/estate');
-    expect(read('src/components/workspaces/property-operating-hub.tsx')).toContain("href: '/estate/work-orders'");
+    expect(read('src/components/workspaces/property-operating-hub.tsx')).toContain("href: '/property-management/work-orders'");
     const security = visibleNav('ops', identityByKey('security').actor, 'estate').flatMap((group) => group.items);
     expect(security.some((item) => item.href === '/estate/work-orders')).toBe(false);
   });
@@ -47,6 +47,6 @@ describe('Independent Estate work-order route ownership', () => {
   it('does not mark new requests with no deadline as SLA breaches', () => {
     const view = read('src/components/work-orders/work-order-detail-view.tsx');
     expect(view).toContain('wo.respondDueAt !== null && wo.respondDueAt < NOW');
-    expect(view).toContain('href={basePath}');
+    expect(view).toContain('href={returnHref ?? basePath}');
   });
 });

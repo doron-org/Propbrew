@@ -9,24 +9,27 @@ import { readCopilotLedgerUsage } from '@/server/ai/copilot-ledger';
 import { isReviewActor, reviewLedgerTenantId, reviewModeEnabled } from '@/server/review-auth';
 import type { CopilotWorld } from '@/domain/facility';
 import { withDurableRead } from '@/server/data/durable-records';
+import { allPropertyRows, atProperty, selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
+import { canEnterWorkspace } from '@/config/workspaces';
 
 /** AI Facility Copilot — reads across every facility signal (alarms, generators,
  *  inventory, contracts, permits, incidents) and fuses them into one ranked list
  *  of actionable priorities, plus a real AI conversation. Actions
  *  fire the real facility mutations (dispatch WO, refuel, receive stock, ack). */
-export default async function CopilotPage() {
+export default async function CopilotPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
+  const site = selectedProperty(actor, await searchParams);
   const clock = operatingClock();
   const world: CopilotWorld = {
-    systems: [...repos.buildingSystems.list(actor).items],
-    alarms: [...repos.facilityAlarms.list(actor).items],
-    generators: [...repos.facilityGenerators.list(actor).items],
-    parts: [...repos.facilityParts.list(actor).items],
-    contracts: [...repos.facilityContracts.list(actor).items],
-    permits: [...repos.facilityPermits.list(actor).items],
-    incidents: [...repos.facilityIncidents.list(actor).items],
-    sensors: [...repos.facilitySensors.list(actor).items],
+    systems: atProperty(allPropertyRows((cursor) => repos.buildingSystems.list(actor, { cursor, limit: 200 })), site),
+    alarms: atProperty(allPropertyRows((cursor) => repos.facilityAlarms.list(actor, { cursor, limit: 200 })), site),
+    generators: atProperty(allPropertyRows((cursor) => repos.facilityGenerators.list(actor, { cursor, limit: 200 })), site),
+    parts: allPropertyRows((cursor) => repos.facilityParts.list(actor, { cursor, limit: 200 })).filter((part) => !site || part.siteId === site.id),
+    contracts: atProperty(allPropertyRows((cursor) => repos.facilityContracts.list(actor, { cursor, limit: 200 })), site),
+    permits: atProperty(allPropertyRows((cursor) => repos.facilityPermits.list(actor, { cursor, limit: 200 })), site),
+    incidents: atProperty(allPropertyRows((cursor) => repos.facilityIncidents.list(actor, { cursor, limit: 200 })), site),
+    sensors: atProperty(allPropertyRows((cursor) => repos.facilitySensors.list(actor, { cursor, limit: 200 })), site),
     nowMs: clock.nowMs,
   };
   const userName = seed.users.find((u) => u.id === actor.userId)?.name ?? 'there';
@@ -47,6 +50,8 @@ export default async function CopilotPage() {
         canConfigure={can(actor, 'reports_analytics', 'update').allowed}
         canCreate={can(actor, 'assets_ppm', 'create').allowed}
         canUpdate={can(actor, 'assets_ppm', 'update').allowed}
+        endpoint={site ? `/api/property-management/copilot?siteId=${encodeURIComponent(String(site.id))}` : '/api/property-management/copilot'}
+        module={canEnterWorkspace(actor, 'estate') && can(actor, 'reports_analytics', 'read').allowed ? 'estate' : 'facility'}
       />
     </div>
   );

@@ -40,6 +40,13 @@ describe('trends', () => {
     expect(real).toBe(false);
     expect(points[points.length - 1]).toBe(rate.value(ds));
   });
+  it('uses the supplied reporting snapshot for SLA and weekly activity', () => {
+    const asOfMs = Date.parse('2028-01-01T12:00:00Z');
+    const workOrder = { ...ds.workOrders[0], status: 'new', createdAt: '2027-12-30T12:00:00Z', resolveDueAt: '2027-12-31T12:00:00Z' } as WorkOrder;
+    const scoped: Dataset = { workOrders: [workOrder], invoices: [], asOfMs };
+    expect(METRICS.find((metric) => metric.id === 'sla_breaches')!.value(scoped)).toBe(1);
+    expect(weeklyThroughput(scoped.workOrders, 10, undefined, asOfMs).reduce((sum, value) => sum + value, 0)).toBe(1);
+  });
 });
 
 describe('csv export', () => {

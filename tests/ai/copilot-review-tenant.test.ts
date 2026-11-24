@@ -148,7 +148,7 @@ describe('Facility cross-module review usage', () => {
   it('reads canonical review totals without changing fixture records or model selection', async () => {
     const actor = reviewActor();
     boundary.guard.mockResolvedValue({ actor });
-    renderToStaticMarkup(await CopilotPage());
+    renderToStaticMarkup(await CopilotPage({ searchParams: Promise.resolve({}) }));
     expect(boundary.usage).toHaveBeenCalledWith(ledgerTenantId);
     expect(boundary.list).toHaveBeenCalledTimes(8);
     for (const call of boundary.list.mock.calls) expect(call[0]).toBe(actor);
@@ -158,14 +158,14 @@ describe('Facility cross-module review usage', () => {
 
   it('keeps customer usage in its original tenant even if review mode is enabled', async () => {
     boundary.guard.mockResolvedValue({ actor: { ...reviewActor(), userId: 'user_customer', tenantId: customerTenantId } });
-    renderToStaticMarkup(await CopilotPage());
+    renderToStaticMarkup(await CopilotPage({ searchParams: Promise.resolve({}) }));
     expect(boundary.usage).toHaveBeenCalledWith(customerTenantId);
     expect(boundary.ledgerTenant).not.toHaveBeenCalled();
   });
 
   it('shows unavailable usage if strict review configuration fails rather than reading seed or zero totals', async () => {
     boundary.ledgerTenant.mockImplementationOnce(() => { throw new ReviewConfigurationError('unit-test-config'); });
-    renderToStaticMarkup(await CopilotPage());
+    renderToStaticMarkup(await CopilotPage({ searchParams: Promise.resolve({}) }));
     expect(boundary.usage).not.toHaveBeenCalled();
     expect(boundary.workspace.mock.calls[0][0]).toMatchObject({ usage: null });
   });

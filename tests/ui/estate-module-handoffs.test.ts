@@ -78,7 +78,7 @@ describe('Estate notification navigation context', () => {
     expect(propertyItems.find((item) => item.label === 'Asset care')?.href).toBe('/properties/estate-1/asset-care');
     expect(propertyItems.find((item) => item.label === 'Building services')?.children?.map((item) => item.label)).toEqual(expect.arrayContaining(['Spaces', 'Sustainability']));
     expect(propertyItems.find((item) => item.label === 'Operations')?.children?.map((item) => item.label)).toEqual(expect.arrayContaining(['Field jobs', 'Vendors & contractors']));
-    expect(propertyItems.find((item) => item.label === 'Intelligence')?.children?.map((item) => item.label)).toContain('Ask building Copilot');
+    expect(propertyItems.find((item) => item.label === 'Intelligence')?.children?.map((item) => item.label)).toContain('Ask Property Copilot');
     expect(groups[2].items.map((item) => item.label)).toContain('Building services');
   });
 

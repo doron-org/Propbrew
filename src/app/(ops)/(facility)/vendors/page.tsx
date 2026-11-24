@@ -6,18 +6,22 @@ import { ScopeBanner } from '@/components/domain';
 import { VendorsExplorer } from '@/components/vendors/vendors-explorer';
 import { facilityMoney } from '@/components/facility/facility-format';
 import { withDurableRead } from '@/server/data/durable-records';
+import { allPropertyRows, atProperty, selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
 
 /** FM-05 — vendor management. Document-expiry compliance drives an alert tone;
  *  performance metrics (jobs, SLA hit rate, rating) come straight off the org.
  *  The directory is interactive: filter, search, sort and drill into a profile. */
-export default async function VendorsPage() {
+export default async function VendorsPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('work_orders', 'read', 'facility');
+  const site = selectedProperty(actor, await searchParams);
   const canMutate = ['F', 'M'].includes(effectiveLevel(actor, 'work_orders'));
-  const vendors = repos.vendors.list(actor).items;
+  const allVendors = allPropertyRows((cursor) => repos.vendors.list(actor, { cursor, limit: 200 }));
 
   // A vendor's assigned jobs — scoped work orders that name it as the vendor.
-  const woList = repos.workOrders.list(actor).items;
+  const woList = atProperty(allPropertyRows((cursor) => repos.workOrders.list(actor, { cursor, limit: 200 })), site);
+  const vendorIds = new Set(woList.map((row) => String(row.vendorOrgId)).filter(Boolean));
+  const vendors = site ? allVendors.filter((row) => vendorIds.has(String(row.id))) : allVendors;
   const jobs = woList
     .filter((w) => w.vendorOrgId)
     .map((w) => ({ id: w.id, ref: w.ref, title: w.title, status: w.status, vendorOrgId: w.vendorOrgId }));

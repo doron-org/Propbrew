@@ -15,20 +15,21 @@ import styles from './copilot-workspace.module.css';
 import { toneVar, type Tone } from '@/lib/status-tones';
 import { copilotInsights, COPILOT_MODELS, COPILOT_RATE_PER_MIN, copilotModel, type CopilotWorld, type Insight } from '@/domain/facility';
 import { dispatchWoFromAlarm, acknowledgeAlarm, receiveStock, logRefuel, setCopilotModel } from '@/server/actions/facility';
+import type { CopilotModule } from '@/lib/ai/copilot-protocol';
 
 const SEV_TONE: Record<Insight['severity'], Tone> = { critical: 'danger', warning: 'warn', info: 'info' };
 const CAT_ICON: Record<string, React.ReactNode> = { Alarm: <AlertTriangle size={18} />, Energy: <Zap size={18} />, Inventory: <Package size={18} />, Contracts: <FileText size={18} />, Safety: <ShieldAlert size={18} /> };
 const SUGGESTIONS = ['What needs me right now?', 'How is our diesel and fuel?', 'Which contracts are expiring?', 'Any parts below reorder?', "What's our carbon and spend?"];
 type Usage = { requests: number; inputTokens: number; outputTokens: number; costMinorNgn: number };
 
-export function CopilotWorkspace({ world, userName, model, usage, canConfigure, canCreate = false, canUpdate = false }: { world: CopilotWorld; userName: string; model: string; usage: Usage | null; canConfigure: boolean; canCreate?: boolean; canUpdate?: boolean }) {
+export function CopilotWorkspace({ world, userName, model, usage, canConfigure, canCreate = false, canUpdate = false, endpoint = '/api/copilot', module = 'facility' }: { world: CopilotWorld; userName: string; model: string; usage: Usage | null; canConfigure: boolean; canCreate?: boolean; canUpdate?: boolean; endpoint?: string; module?: Extract<CopilotModule, 'estate' | 'facility'> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [toast, setToast] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [section, setSection] = useState('conversation');
   const [review, setReview] = useState<Insight | null>(null);
-  const { exchanges: thread, busy: asking, submit, stop, retry } = useCopilotStream({ endpoint: '/api/copilot', module: 'facility', onComplete: (exchange) => { if (exchange.usage?.recorded) router.refresh(); } });
+  const { exchanges: thread, busy: asking, submit, stop, retry } = useCopilotStream({ endpoint, module, onComplete: (exchange) => { if (exchange.usage?.recorded) router.refresh(); } });
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const actionRef = useRef(false);

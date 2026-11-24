@@ -16,7 +16,7 @@ export const REVIEW_COOKIE_OPTIONS = { path: '/', httpOnly: true, secure: true, 
 const CSRF_SECONDS = 15 * 60;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REVIEW_USER = 'propbrew-private-review-estate-manager';
-const COPILOT_PATHS = new Set(['/api/copilot', '/api/estate/copilot', '/api/shortlet/copilot', '/api/construction/copilot']);
+const COPILOT_PATHS = new Set(['/api/copilot', '/api/estate/copilot', '/api/property-management/copilot', '/api/shortlet/copilot', '/api/construction/copilot']);
 
 export class ReviewConfigurationError extends Error {
   constructor(field: string) { super(`Private review configuration is invalid: ${field}.`); }

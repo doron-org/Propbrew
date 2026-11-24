@@ -9,26 +9,28 @@ import { AssetsExplorer, type AssetHealth } from '@/components/assets/assets-exp
 import { withDurableRead } from '@/server/data/durable-records';
 import { currentRecordContext } from '@/server/data/record-context';
 import { nativeAuthEnabled } from '@/server/auth/mode';
+import { allPropertyRows, atProperty, selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
 
 /** FM-01 — asset register. Facility Manager can add (M); Executive/Technician are
  *  view-only (V). Assets are archived, never deleted. The register is
  *  interactive: filter by status/category, search, and drill into an asset's PPM
  *  plans and full work-order service history. */
-export default async function AssetsPage() {
+export default async function AssetsPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
+  const site = selectedProperty(actor, await searchParams);
   const canMutate = ['F', 'M'].includes(effectiveLevel(actor, 'assets_ppm'));
   const registrationReady = nativeAuthEnabled() && Boolean(actor.companyAccess) && currentRecordContext()?.domainTenantId === actor.tenantId;
-  const assets = repos.assets.list(actor).items;
-  const ppm = repos.ppmPlans.list(actor).items;
+  const assets = atProperty(allPropertyRows((cursor) => repos.assets.list(actor, { cursor, limit: 200 })), site);
+  const ppm = atProperty(allPropertyRows((cursor) => repos.ppmPlans.list(actor, { cursor, limit: 200 })), site);
 
-  const jobs = repos.workOrders.list(actor).items
+  const jobs = atProperty(allPropertyRows((cursor) => repos.workOrders.list(actor, { cursor, limit: 200 })), site)
     .filter((w) => w.assetId)
     .map((w) => ({ id: w.id, ref: w.ref, title: w.title, status: w.status, assetId: w.assetId, costLabel: w.cost ? facilityMoney(w.cost.minor, w.cost.currency) : '—' }));
 
   // AI-F-01 asset-health from the PPM risk engine, keyed by asset for the cards.
   const health: Record<string, AssetHealth> = {};
-  for (const r of scoreAssets(actor)) health[String(r.assetId)] = { score: r.score, band: r.band, topDriver: r.topDriver, confidence: r.confidence };
+  for (const r of scoreAssets(actor).filter((row) => assets.some((asset) => String(asset.id) === String(row.assetId)))) health[String(r.assetId)] = { score: r.score, band: r.band, topDriver: r.topDriver, confidence: r.confidence };
 
   return (
     <div className="pb-page">
@@ -42,7 +44,7 @@ export default async function AssetsPage() {
         health={health}
         canMutate={canMutate}
         registrationReady={registrationReady}
-        locations={repos.sites.list(actor, { limit: 200 }).items.map((site) => ({ id: String(site.id), label: site.name }))}
+        locations={allPropertyRows((cursor) => repos.sites.list(actor, { cursor, limit: 200 })).filter((entry) => !site || entry.id === site.id).map((entry) => ({ id: String(entry.id), label: entry.name }))}
       />
     </div>
   );

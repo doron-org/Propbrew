@@ -5,15 +5,17 @@ import { repos } from '@/server/data';
 import { permitConflicts } from '@/domain/facility';
 import { SafetyWorkspace } from '@/components/facility/safety-workspace';
 import { withDurableRead } from '@/server/data/durable-records';
+import { allPropertyRows, atProperty, selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
 
 /** Safety & Permits — permit-to-work register with automatic clash detection
  *  (overlapping permits in the same location), a lifecycle flow, and an
  *  incident log. A live safety score reflects open incidents and conflicts. */
-export default async function SafetyPage() {
+export default async function SafetyPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
-  const permits = repos.facilityPermits.list(actor).items;
-  const incidents = repos.facilityIncidents.list(actor).items;
+  const site = selectedProperty(actor, await searchParams);
+  const permits = atProperty(allPropertyRows((cursor) => repos.facilityPermits.list(actor, { cursor, limit: 200 })), site);
+  const incidents = atProperty(allPropertyRows((cursor) => repos.facilityIncidents.list(actor, { cursor, limit: 200 })), site);
 
   const conflicts = permitConflicts(permits);
   const openIncidents = incidents.filter((i) => i.status === 'open');

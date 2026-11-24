@@ -10,12 +10,15 @@ import { createEstateWorkOrder } from '@/server/actions/estate-work-orders';
 export type EstateWorkOrderSiteOption = { id: string; label: string };
 export type EstateWorkOrderUnitOption = { id: string; siteId: string; label: string };
 
-export function EstateWorkOrderCreate({ sites, units = [], demo, native = false, persistent = false }: {
+export function EstateWorkOrderCreate({ sites, units = [], demo, native = false, persistent = false, detailBase = '/estate/work-orders', detailQuery = '', buttonLabel = 'New work order' }: {
   sites: EstateWorkOrderSiteOption[];
   units?: EstateWorkOrderUnitOption[];
   demo: boolean;
   native?: boolean;
   persistent?: boolean;
+  detailBase?: string;
+  detailQuery?: string;
+  buttonLabel?: string;
 }) {
   const router = useRouter();
   const prefix = useId();
@@ -47,7 +50,7 @@ export function EstateWorkOrderCreate({ sites, units = [], demo, native = false,
         });
         if (!result.ok) { setError(result.error); return; }
         setOpen(false);
-        router.push(`/estate/work-orders/${encodeURIComponent(result.ref)}`);
+        router.push(`${detailBase}/${encodeURIComponent(result.ref)}${detailQuery}`);
         router.refresh();
       } catch {
         setError('We could not confirm the save. Your entries are still here. Try again to safely check this request.');
@@ -56,7 +59,7 @@ export function EstateWorkOrderCreate({ sites, units = [], demo, native = false,
   }
 
   return <>
-    <Button type="button" variant="primary" icon={<Plus size={16} aria-hidden="true" />} onClick={show}>New work order</Button>
+    <Button type="button" variant="primary" icon={<Plus size={16} aria-hidden="true" />} onClick={show}>{buttonLabel}</Button>
     {open ? <PortalDialog label="New estate work order" width={560} onClose={() => setOpen(false)} canClose={!pending} dismissOnBackdrop={false}>
       <div className="pb-panel">
         <div className="flex items-start justify-between gap-4 mb-5">

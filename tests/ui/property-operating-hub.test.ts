@@ -34,7 +34,7 @@ describe('property-first Estate information architecture', () => {
     expect(hub).not.toContain("{ id: 'community', label: 'Community & governance'");
     expect(hub).not.toContain("{ id: 'finance', label: 'Finance & commerce'");
     expect(hub).not.toContain("{ id: 'intelligence', label: 'Intelligence'");
-    for (const route of ['/estate/work-orders', '/announcements', '/governance', '/billing', '/collections', '/estate/copilot']) {
+    for (const route of ['/property-management/work-orders', '/announcements', '/governance', '/billing', '/collections', '/property-management/copilot']) {
       expect(hub).toContain(`href: '${route}'`);
     }
     expect(hub).toContain('propertyId: property.id');
@@ -50,7 +50,7 @@ describe('property-first Estate information architecture', () => {
     expect(shell).toContain('children: intelligenceItems(site.id)');
     expect(shell).toContain("label: 'Work orders'");
     expect(shell).toContain("label: 'Parcels & lockers'");
-    for (const child of ['Announcements', 'Board & committee', 'Billing', 'Marketplace', 'Finance centre', 'Ask Copilot']) {
+    for (const child of ['Announcements', 'Board & committee', 'Billing', 'Marketplace', 'Finance centre', 'Ask Property Copilot']) {
       expect(shell).toContain(`label: '${child}'`);
     }
     for (const section of ['operations', 'community-governance', 'finance-commerce', 'intelligence']) {

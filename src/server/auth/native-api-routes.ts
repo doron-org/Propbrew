@@ -1,4 +1,4 @@
-const aiRoutes = new Set(['/api/copilot', '/api/estate/copilot', '/api/shortlet/copilot', '/api/construction/copilot']);
+const aiRoutes = new Set(['/api/copilot', '/api/estate/copilot', '/api/property-management/copilot', '/api/shortlet/copilot', '/api/construction/copilot']);
 const fileId = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const facilityEvidence = new RegExp(`^/api/facility/evidence/${fileId}$`, 'i');
 const constructionDrawing = new RegExp(`^/api/construction/drawings/${fileId}$`, 'i');

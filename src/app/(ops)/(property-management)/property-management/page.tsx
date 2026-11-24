@@ -6,6 +6,7 @@ import type { Page } from '@/domain/primitives';
 import { repos } from '@/server/data';
 import { withDurableRead } from '@/server/data/durable-records';
 import { requireOperatorSession } from '@/server/workspaces';
+import { authorisedPropertySites } from '@/server/reads/property-management-scope';
 import styles from './property-management.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -27,8 +28,7 @@ export default async function PropertyManagementPage() {
     const estate = canEnterWorkspace(actor, 'estate');
     const facility = canEnterWorkspace(actor, 'facility');
     const canReadSites = can(actor, 'assets_ppm', 'read').allowed;
-    const sites = canReadSites ? allRows((cursor) => repos.sites.list(actor, { cursor, limit: 200 }))
-      .filter((site) => site.kind === 'estate' ? estate || facility : site.kind === 'facility' && facility) : [];
+    const sites = canReadSites || can(actor, 'work_orders', 'read').allowed || estate && can(actor, 'reports_analytics', 'read').allowed ? authorisedPropertySites(actor) : [];
     const siteIds = new Set(sites.map((site) => String(site.id)));
     const units = estate && canReadSites ? allRows((cursor) => repos.units.list(actor, { cursor, limit: 200 }))
       .filter((unit) => siteIds.has(String(unit.siteId))) : [];
@@ -41,13 +41,13 @@ export default async function PropertyManagementPage() {
     const openOrders = workOrders.filter((order) => !closedStatuses.has(order.status));
     const quickLinks = [
       estate ? { label: 'Estate dashboard', detail: 'Residents, collections and community', href: '/estate', icon: House } : null,
-      facility ? { label: 'Facility control centre', detail: 'Building systems and operational alarms', href: '/facility', icon: Building2 } : null,
+      facility ? { label: 'Building control centre', detail: 'Systems and operational alarms', href: '/control-center', icon: Building2 } : null,
       estate && canReadSites ? { label: 'Estate properties', detail: 'Units, residents and tenancy', href: '/properties', icon: House } : null,
       estate && can(actor, 'charges_invoicing', 'read').allowed ? { label: 'Finance & collections', detail: 'Naira charges and receivables', href: '/collections', icon: ClipboardCheck } : null,
       facility && canReadSites ? { label: 'Assets & maintenance', detail: 'Equipment, service history and planned care', href: '/assets', icon: Boxes } : null,
-      facility && can(actor, 'work_orders', 'read').allowed ? { label: 'Facility work orders', detail: 'Dispatch, field jobs and follow-up', href: '/work-orders', icon: Wrench } : null,
-      estate && can(actor, 'reports_analytics', 'read').allowed ? { label: 'Property AI Copilot', detail: 'Answers grounded in authorised estate records', href: '/estate/copilot', icon: Sparkles } : null,
-      facility && canReadSites ? { label: 'Facility AI Copilot', detail: 'Investigate operational signals and assets', href: '/copilot', icon: Sparkles } : null,
+      can(actor, 'work_orders', 'read').allowed ? { label: 'Property work orders', detail: 'Resident requests and building maintenance together', href: '/property-management/work-orders', icon: Wrench } : null,
+      (estate && can(actor, 'reports_analytics', 'read').allowed || facility && canReadSites) ? { label: 'Property performance', detail: 'Maintenance, assets and authorised finance', href: '/property-management/reports', icon: ClipboardCheck } : null,
+      (estate && can(actor, 'reports_analytics', 'read').allowed || facility && canReadSites) ? { label: 'Property AI Copilot', detail: 'Answers across authorised property records', href: '/property-management/copilot', icon: Sparkles } : null,
     ].filter((link): link is NonNullable<typeof link> => link !== null);
 
     return <div className={styles.page}>
@@ -67,12 +67,14 @@ export default async function PropertyManagementPage() {
         <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Portfolio</p><h2 id="portfolio-title">Your properties and sites</h2></div><span>{sites.length} in your scope</span></div>
         {sites.length ? <div className={styles.propertyGrid}>{sites.sort((a, b) => a.name.localeCompare(b.name, 'en-NG', { numeric: true })).map((site) => {
           const isEstate = site.kind === 'estate' && estate;
-          const href = isEstate ? `/properties/${encodeURIComponent(String(site.id))}` : `/facility/sites/${encodeURIComponent(String(site.id))}`;
+          const href = canReadSites ? isEstate ? `/properties/${encodeURIComponent(String(site.id))}` : `/facility/sites/${encodeURIComponent(String(site.id))}`
+            : can(actor, 'work_orders', 'read').allowed ? `/property-management/work-orders?siteId=${encodeURIComponent(String(site.id))}`
+            : `/property-management/reports?siteId=${encodeURIComponent(String(site.id))}`;
           const count = isEstate ? units.filter((unit) => unit.siteId === site.id).length : assets.filter((asset) => asset.siteId === site.id).length;
           const outstanding = openOrders.filter((order) => order.siteId === site.id).length;
           return <Link key={`${site.kind}-${site.id}`} href={href} className={styles.propertyCard}>
             <span className={styles.propertyIcon}><Building2 size={20} aria-hidden="true" /></span>
-            <span className={styles.propertyBody}><span className={styles.kind}>{isEstate ? 'Estate property' : 'Facility site'}</span><strong>{site.name}</strong><small>{site.address || 'Address not recorded'}</small><span className={styles.propertyMeta}>{count} {isEstate ? 'registered units' : 'assets'}<span aria-hidden="true">·</span>{outstanding} open work orders</span></span>
+            <span className={styles.propertyBody}><span className={styles.kind}>{isEstate ? 'Estate property' : 'Facility site'}</span><strong>{site.name}</strong><small>{site.address || 'Address not recorded'}</small><span className={styles.propertyMeta}>{canReadSites ? <>{count} {isEstate ? 'registered units' : 'assets'}<span aria-hidden="true">·</span></> : null}{can(actor, 'work_orders', 'read').allowed ? `${outstanding} open work orders` : 'Open property view'}</span></span>
             <ArrowUpRight size={17} aria-hidden="true" />
           </Link>;
         })}</div> : <p className={styles.empty}>No property or facility site is assigned to this role yet. Your company administrator can add you to a property in Team & access.</p>}

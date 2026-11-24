@@ -35,7 +35,7 @@ const EVENT_META: Record<string, { label: string; variant: LegalEvent['variant']
   CANCEL: { label: 'Cancel', variant: 'danger', needsAssignee: false },
 };
 
-export async function WorkOrderDetailView({ actor, wo, basePath }: { actor: Actor; wo: WorkOrder; basePath: '/work-orders' | '/estate/work-orders' }) {
+export async function WorkOrderDetailView({ actor, wo, basePath, returnHref }: { actor: Actor; wo: WorkOrder; basePath: '/work-orders' | '/estate/work-orders'; returnHref?: string }) {
   return withDurableRead(async () => {
   const canTransition = can(actor, 'work_orders', 'transition').allowed;
 
@@ -60,7 +60,7 @@ export async function WorkOrderDetailView({ actor, wo, basePath }: { actor: Acto
 
   return (
     <div className="pb-page">
-      <Link href={basePath} className={polish.link}>
+      <Link href={returnHref ?? basePath} className={polish.link}>
         <ArrowLeft size={15} /> Work orders
       </Link>
 

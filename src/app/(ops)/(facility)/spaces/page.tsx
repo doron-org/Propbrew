@@ -9,6 +9,7 @@ import { nativeAuthEnabled } from '@/server/auth/mode';
 import { SpacesExplorer } from '@/components/spaces/spaces-explorer';
 import { PageHeader } from '@/components/ui/page-header';
 import { withDurableRead } from '@/server/data/durable-records';
+import { selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
 
 function allRows<T>(read: (cursor?: string | null) => Page<T>): T[] {
   const rows: T[] = [];
@@ -27,10 +28,11 @@ const keyFor = (tenantId: string, id: string) => JSON.stringify([tenantId, id]);
  *  maintained once and shared with the Estate module. Sites come scoped; the
  *  buildings/units are filtered to those sites, and resident names are attached
  *  only if the actor may read them (§7). */
-export default async function SpacesPage() {
+export default async function SpacesPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
-  const sites = allRows((cursor) => repos.sites.list(actor, { cursor, limit: 200 }));
+  const site = selectedProperty(actor, await searchParams);
+  const sites = allRows((cursor) => repos.sites.list(actor, { cursor, limit: 200 })).filter((entry) => !site || entry.id === site.id);
   const siteIds = new Set(sites.map((site) => keyFor(site.tenantId, site.id)));
   const buildings = allRows((cursor) => repos.buildings.list(actor, { cursor, limit: 200 })).filter((building) => siteIds.has(keyFor(building.tenantId, building.siteId)));
   const units = allRows((cursor) => repos.units.list(actor, { cursor, limit: 200 })).filter((unit) => siteIds.has(keyFor(unit.tenantId, unit.siteId)));
@@ -55,7 +57,7 @@ export default async function SpacesPage() {
   return (
     <div className="pb-page">
       <PageHeader title="Spaces" subtitle="Explore your properties, buildings and units in one place."
-        actions={nativeAuthEnabled() && currentRecordContext()?.companyPrincipal && actor.tenantId ? <FacilitySiteCreate companyId={actor.tenantId} canCreate={actor.allEstates && can(actor, 'assets_ppm', 'create').allowed} /> : undefined}
+        actions={!site && nativeAuthEnabled() && currentRecordContext()?.companyPrincipal && actor.tenantId ? <FacilitySiteCreate companyId={actor.tenantId} canCreate={actor.allEstates && can(actor, 'assets_ppm', 'create').allowed} /> : undefined}
         scope={<ScopeBanner label={actor.allEstates ? 'all estates' : `${actor.estateIds.length} estate(s)`} />}
       />
       <SpacesExplorer

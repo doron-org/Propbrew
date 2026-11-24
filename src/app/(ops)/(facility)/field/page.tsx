@@ -8,6 +8,7 @@ import type { Page } from '@/domain/primitives';
 
 import { TechnicianWorkspace, type Job } from '@/components/facility/technician-workspace';
 import { withDurableRead } from '@/server/data/durable-records';
+import { atProperty, selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
 
 function allRows<T>(read: (cursor?: string | null) => Page<T>): T[] {
   const rows: T[] = [];
@@ -25,14 +26,15 @@ const keyFor = (tenantId: string, id: string) => JSON.stringify([tenantId, id]);
 /** My Day — the field technician's mobile-first job list. Their own assigned work
  *  (scoped to assigned_to_me), grouped On now / Up next / Waiting / Done, with big
  *  tap targets that fire the real §10 work-order transitions and live SLA counts. */
-export default async function FieldPage() {
+export default async function FieldPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('work_orders', 'read', 'facility');
+  const site = selectedProperty(actor, await searchParams);
   const clock = operatingClock();
-  const jobs = allRows((cursor) => repos.workOrders.list(actor, { cursor, limit: 200 }));
+  const jobs = atProperty(allRows((cursor) => repos.workOrders.list(actor, { cursor, limit: 200 })), site);
   const seesSpaces = can(actor, 'assets_ppm', 'read').allowed;
-  const sites = new Map(seesSpaces ? allRows((cursor) => repos.sites.list(actor, { cursor, limit: 200 })).map((site) => [keyFor(site.tenantId, site.id), site.name]) : []);
-  const assets = new Map(seesSpaces ? allRows((cursor) => repos.assets.list(actor, { cursor, limit: 200 })).map((asset) => [keyFor(asset.tenantId, asset.id), asset.name]) : []);
+  const sites = new Map(seesSpaces ? allRows((cursor) => repos.sites.list(actor, { cursor, limit: 200 })).filter((entry) => !site || entry.id === site.id).map((entry) => [keyFor(entry.tenantId, entry.id), entry.name]) : []);
+  const assets = new Map(seesSpaces ? atProperty(allRows((cursor) => repos.assets.list(actor, { cursor, limit: 200 })), site).map((asset) => [keyFor(asset.tenantId, asset.id), asset.name]) : []);
   const units = new Map(seesSpaces ? allRows((cursor) => repos.units.list(actor, { cursor, limit: 200 })).filter((unit) => sites.has(keyFor(unit.tenantId, unit.siteId))).map((unit) => [keyFor(unit.tenantId, unit.id), unit.label]) : []);
   const session = await getSession();
   const techName = session?.actor.userId === actor.userId ? session.label.split(' — ')[0] : 'there';

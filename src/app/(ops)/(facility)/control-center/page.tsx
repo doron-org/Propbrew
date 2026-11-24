@@ -8,18 +8,20 @@ import { repos } from '@/server/data';
 import { siteHealth } from '@/domain/facility';
 import { ControlCenter, type SystemRow, type SensorRow, type AlarmRow } from '@/components/facility/control-center';
 import { withDurableRead } from '@/server/data/durable-records';
+import { allPropertyRows, atProperty, selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
 
 /** Facility Control Center — a live building-operations command centre. Composite
  *  site health, live sensors (water/fuel/temp/power/occupancy), building-system
  *  status, and an active-alarm feed where one tap dispatches a work order. */
-export default async function ControlCenterPage() {
+export default async function ControlCenterPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<PropertyQuery> } = {}) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
+  const site = selectedProperty(actor, await searchParams);
   const clock = operatingClock();
-  const sites = new Map<string, string>(repos.sites.all(actor).map((s) => [s.id, s.name]));
-  const systems = repos.buildingSystems.list(actor).items;
-  const sensors = repos.facilitySensors.list(actor).items;
-  const alarms = repos.facilityAlarms.list(actor).items;
+  const sites = new Map<string, string>(repos.sites.all(actor).filter((entry) => !site || entry.id === site.id).map((s) => [s.id, s.name]));
+  const systems = atProperty(allPropertyRows((cursor) => repos.buildingSystems.list(actor, { cursor, limit: 200 })), site);
+  const sensors = atProperty(allPropertyRows((cursor) => repos.facilitySensors.list(actor, { cursor, limit: 200 })), site);
+  const alarms = atProperty(allPropertyRows((cursor) => repos.facilityAlarms.list(actor, { cursor, limit: 200 })), site);
 
   const health = siteHealth(systems);
   const water = sensors.find((s) => s.kind === 'water_tank');

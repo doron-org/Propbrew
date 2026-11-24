@@ -6,10 +6,10 @@ import { facilityInventoryState, facilityPartSnapshot, type FacilityStockMovemen
 import type { Part } from '@/domain/facility';
 
 export type FacilityPartView = Part & { metadata: FacilityPartMetadata | null; snapshot: string; siteName: string };
-export function listFacilityInventory(actor: Actor, options: { before?: string; limit?: number; partId?: string; includeArchived?: boolean } = {}) {
+export function listFacilityInventory(actor: Actor, options: { before?: string; limit?: number; partId?: string; siteId?: string; includeArchived?: boolean } = {}) {
   const scope = assertCan(actor, 'assets_ppm', 'read'), context = currentRecordContext();
   const data = context ? facilityInventoryState(context.state, actor.tenantId!) : { parts: [], movements: [] };
-  const all = db.facilityParts.filter((part) => part.tenantId === actor.tenantId && (part.siteId ? matchesScope(part, scope) : actor.allEstates));
+  const all = db.facilityParts.filter((part) => part.tenantId === actor.tenantId && (part.siteId ? matchesScope(part, scope) : actor.allEstates) && (!options.siteId || part.siteId === options.siteId));
   const parts: FacilityPartView[] = all.flatMap((part) => {
     const metadata = data.parts.find((row) => row.tenantId === actor.tenantId && row.partId === part.id) ?? null;
     if (!options.includeArchived && metadata?.status === 'archived') return [];

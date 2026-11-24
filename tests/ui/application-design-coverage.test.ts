@@ -10,7 +10,7 @@ const groupPages = (prefix: string, routes: readonly string[]) => routes.map((ro
 /** Explicit review manifest. New, moved or removed pages must be reviewed here;
  * discovery is compared with this list, never used to silently enlarge it. */
 const reviewed = {
-  propertyManagement: groupPages('(ops)/(property-management)', ['property-management']),
+  propertyManagement: groupPages('(ops)/(property-management)', ['property-management', 'property-management/work-orders', 'property-management/work-orders/[ref]', 'property-management/reports', 'property-management/copilot']),
   estate: groupPages('(ops)/(estate)', [
     'announcements', 'billing', 'board', 'bookings', 'collections', 'community', 'documents',
     'estate', 'events', 'finance', 'governance', 'investors', 'marketplace', 'parcels', 'people',
@@ -74,19 +74,19 @@ function discoverPages(directory: string): string[] {
 }
 
 describe('Exhaustive application design review manifest', () => {
-  it('accounts for every one of the 141 page files with no ignored directory or dynamic route', () => {
+  it('accounts for every one of the 145 page files with no ignored directory or dynamic route', () => {
     const files = manifest.map(({ file }) => file);
-    expect(new Set(files).size).toBe(141);
-    expect(files).toHaveLength(141);
+    expect(new Set(files).size).toBe(145);
+    expect(files).toHaveLength(145);
     expect(files.slice().sort()).toEqual(discoverPages(APP).sort());
     expect(files).toContain('(ops)/(facility)/work-orders/[ref]/page.tsx');
     expect(files).toContain('sign-up/[[...sign-up]]/page.tsx');
-    expect(manifest.filter(({ family }) => family !== 'publicMarketing')).toHaveLength(140);
+    expect(manifest.filter(({ family }) => family !== 'publicMarketing')).toHaveLength(144);
   });
 
   it.each([
     ['estate', 28], ['facility', 19], ['construction', 31], ['shortlet', 21],
-    ['portal', 16], ['admin', 8], ['entryShared', 16], ['propertyManagement', 1], ['publicMarketing', 1],
+    ['portal', 16], ['admin', 8], ['entryShared', 16], ['propertyManagement', 5], ['publicMarketing', 1],
   ] as const)('explicitly reviews all %s pages (%i)', (family, count) => {
     expect(reviewed[family]).toHaveLength(count);
   });

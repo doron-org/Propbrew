@@ -62,8 +62,8 @@ const delegates = declarations.filter(({ fn }) => !asyncFunction(fn));
 
 describe('durable authenticated read entrypoints', () => {
   it('covers every authenticated page, including portal/admin and dynamic detail routes', () => {
-    expect(authenticated).toHaveLength(127);
-    expect(authenticated.filter(({ file }) => file.startsWith(GROUPS[0]))).toHaveLength(103);
+    expect(authenticated).toHaveLength(131);
+    expect(authenticated.filter(({ file }) => file.startsWith(GROUPS[0]))).toHaveLength(107);
     expect(authenticated.filter(({ file }) => file.startsWith(GROUPS[1]))).toHaveLength(16);
     expect(authenticated.filter(({ file }) => file.startsWith(GROUPS[2]))).toHaveLength(8);
     expect(authenticated.map(({ file }) => file)).toContain('src/app/(ops)/(estate)/estate/work-orders/[ref]/page.tsx');
@@ -112,7 +112,7 @@ describe('durable authenticated read entrypoints', () => {
     }
   });
 
-  it.each(AI_ROUTES)('protects the %s provider entrypoint with a read-only boundary', (file) => {
+  it.each([...AI_ROUTES, ['src/app/api/property-management/copilot/route.ts', 'property-management'] as const])('protects the %s provider entrypoint with a read-only boundary', (file) => {
     const fn = source(file).statements.find((node): node is ts.FunctionDeclaration => asyncFunction(node) && node.name?.text === 'POST');
     expect(fn).toBeDefined();
     expectReadBoundary(file, fn!);

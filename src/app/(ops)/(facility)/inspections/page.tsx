@@ -10,6 +10,7 @@ import type { InspectionsData } from '@/components/inspections/types';
 import { withDurableRead } from '@/server/data/durable-records';
 import { facilityComplianceSetup, facilityComplianceConfiguration, facilityInspectionOperation, facilityComplianceHistory } from '@/server/reads/facility-compliance';
 import type { Page } from '@/domain/primitives';
+import { atProperty, selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
 
 function allRows<T>(read: (cursor?: string | null) => Page<T>): T[] {
   const rows: T[] = [];
@@ -23,20 +24,25 @@ function allRows<T>(read: (cursor?: string | null) => Page<T>): T[] {
  *  it up, and running an inspection marks its checklist and auto-raises a work
  *  order per failed item (FM-06 → FM-03). Everything is estate/tenant-scoped
  *  (§8.2); running/managing is Facility-Manager-gated, view is read-only. */
-export default async function InspectionsPage() {
+export default async function InspectionsPage({ searchParams }: { searchParams: Promise<PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('inspections_compliance', 'read', 'facility');
+  const site = selectedProperty(actor, await searchParams);
   const clock = operatingClock();
   const canMutate = can(actor, 'inspections_compliance', 'transition').allowed;
 
+  const rawSetup = actor.companyAccess ? facilityComplianceSetup(actor) : undefined;
+  const setup = rawSetup && site ? { ...rawSetup, sites: rawSetup.sites.filter((row) => row.id === site.id), assets: rawSetup.assets.filter((row) => row.siteId === site.id) } : rawSetup;
+  const obligations = atProperty(allRows((cursor) => repos.complianceObligations.list(actor, { cursor, limit: 200 })), site);
+  const visibleObligations = new Set(obligations.map((row) => row.id));
   const data: InspectionsData = {
     now: clock.dateISO,
     canMutate,
     companyId: actor.companyAccess ? actor.tenantId ?? undefined : undefined,
-    setup: actor.companyAccess ? facilityComplianceSetup(actor) : undefined,
-    history: actor.companyAccess ? facilityComplianceHistory(actor) : undefined,
-    obligations: allRows((cursor) => repos.complianceObligations.list(actor, { cursor, limit: 200 })).map((row) => ({ ...row, configuration: facilityComplianceConfiguration(actor, row.id) })),
-    inspections: allRows((cursor) => repos.inspections.list(actor, { cursor, limit: 200 })).map((row) => ({ ...row, operation: facilityInspectionOperation(actor, row.id) })),
+    setup,
+    history: actor.companyAccess ? facilityComplianceHistory(actor).filter((row) => !site || visibleObligations.has(row.obligationId)) : undefined,
+    obligations: obligations.map((row) => ({ ...row, configuration: facilityComplianceConfiguration(actor, row.id) })),
+    inspections: atProperty(allRows((cursor) => repos.inspections.list(actor, { cursor, limit: 200 })), site).map((row) => ({ ...row, operation: facilityInspectionOperation(actor, row.id) })),
   };
 
   return (

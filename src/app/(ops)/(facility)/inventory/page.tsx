@@ -9,19 +9,21 @@ import { nativeAuthEnabled } from '@/server/auth/mode';
 import { inventoryValuation } from '@/domain/facility/inventory-setup';
 import { listFacilityInventory } from '@/server/reads/facility-inventory';
 import { db } from '@/server/data/store';
+import { selectedProperty, type PropertyQuery } from '@/server/reads/property-management-scope';
 
 /** Inventory — spare-parts stock with stock-out forecasting and receive-to-stock.
  *  Below-reorder and soon-to-stock-out parts are flagged so nothing runs dry
  *  mid-repair. */
-export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ before?: string; view?: string }> }) {
+export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ before?: string; view?: string } & PropertyQuery> }) {
   return withDurableRead(async () => {
   const { actor } = await requireCapability('assets_ppm', 'read', 'facility');
   const params = await searchParams;
+  const site = selectedProperty(actor, params);
   const native = nativeAuthEnabled();
-  const setup = native ? listFacilityInventory(actor, { before: typeof params.before === 'string' ? params.before : undefined, limit: 50, includeArchived: true }) : null;
-  const parts = setup ? setup.parts : repos.facilityParts.list(actor).items;
+  const setup = native ? listFacilityInventory(actor, { before: typeof params.before === 'string' ? params.before : undefined, siteId: site ? String(site.id) : undefined, limit: 50, includeArchived: true }) : null;
+  const parts = setup ? setup.parts : repos.facilityParts.list(actor).items.filter((part) => !site || part.siteId === site.id);
   const scope = assertCan(actor, 'assets_ppm', 'read');
-  const sites = native ? db.sites.filter((site) => matchesScope({ ...site, siteId: site.id }, scope)).map((site) => ({ id: String(site.id), name: site.name })) : [];
+  const sites = native ? db.sites.filter((entry) => matchesScope({ ...entry, siteId: entry.id }, scope) && (!site || entry.id === site.id)).map((entry) => ({ id: String(entry.id), name: entry.name })) : [];
 
   return (
     <div className="pb-page">
