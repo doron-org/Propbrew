@@ -9,9 +9,9 @@ import { can } from '@/lib/authz';
 export async function POST(request: Request) {
   return withDurableRead(async () => {
     const actor = (await getSession())?.actor;
-    const module = actor && canEnterWorkspace(actor, 'estate') && can(actor, 'reports_analytics', 'read').allowed ? 'estate' : 'facility';
+    const copilotModule = actor && canEnterWorkspace(actor, 'estate') && can(actor, 'reports_analytics', 'read').allowed ? 'estate' : 'facility';
     const id = new URL(request.url).searchParams.get('siteId');
     const site = actor && new URL(request.url).searchParams.has('siteId') ? selectedProperty(actor, { siteId: id ?? '' }) : null;
-    return handleCopilot(request, module, (authorisedActor) => buildPropertyManagementContext(authorisedActor, module, site));
+    return handleCopilot(request, copilotModule, (authorisedActor) => buildPropertyManagementContext(authorisedActor, copilotModule, site));
   });
 }
